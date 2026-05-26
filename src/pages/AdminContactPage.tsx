@@ -465,15 +465,7 @@ export default function AdminContactPage() {
                       </div>
                     ) : null)}
                   </div>
-                  <div className="p-4 bg-surface-50 rounded-xl text-sm text-surface-700 mb-5 leading-relaxed">{selected.mensaje}</div>
-                  <div className="flex gap-3">
-                    <button type="button" className="btn-primary flex-1 justify-center" onClick={() => { void setSolicitudEstado(selected.id, 'aprobado'); setSelected(null); }}>
-                      <CheckCircle2 className="w-4 h-4" /> Aprobar
-                    </button>
-                    <button type="button" className="btn-secondary flex-1 justify-center" onClick={() => { void setSolicitudEstado(selected.id, 'rechazado'); setSelected(null); }}>
-                      <XCircle className="w-4 h-4" /> Rechazar
-                    </button>
-                  </div>
+                  <div className="p-4 bg-surface-50 rounded-xl text-sm text-surface-700 leading-relaxed">{selected.mensaje}</div>
                 </div>
               </div>
             </motion.div>

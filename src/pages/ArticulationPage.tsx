@@ -111,7 +111,7 @@ export default function ArticulationPage() {
     if (error) toast.error(error.message);
     else {
       toast.success('Publicacion eliminada');
-      await load();
+      setPublications((prev) => prev.filter((p) => p.id !== pub.id));
     }
   };
 
@@ -134,7 +134,7 @@ export default function ArticulationPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{initials(user?.nombre ?? 'U', user?.apellido)}</div>
             <div className="flex-1 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <select className="input-field py-2" value={tipo} onChange={(event) => setTipo(event.target.value as Publicacion['tipo'])}>
+                <select aria-label="Tipo de publicacion" className="input-field py-2" value={tipo} onChange={(event) => setTipo(event.target.value as Publicacion['tipo'])}>
                   <option value="publicacion">Publicacion</option>
                   <option value="oportunidad">Oportunidad</option>
                   <option value="convocatoria">Convocatoria</option>
