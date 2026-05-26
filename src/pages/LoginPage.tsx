@@ -30,7 +30,13 @@ export default function LoginPage() {
     });
 
     if (authError) {
-      setError('Correo o contrasena incorrectos');
+      if (authError.message.includes('Email not confirmed')) {
+        setError('Debes confirmar tu correo antes de ingresar. Revisa tu bandeja de entrada.');
+      } else if (authError.message.includes('Invalid login credentials')) {
+        setError('Correo o contraseña incorrectos.');
+      } else {
+        setError(`Error: ${authError.message}`);
+      }
       setLoading(false);
       return;
     }
@@ -39,7 +45,7 @@ export default function LoginPage() {
       const profile = await getCurrentProfile();
       if (!profile) {
         await supabase.auth.signOut();
-        setError('Tu usuario no tiene perfil asociado en la plataforma');
+        setError('Tu usuario no tiene perfil asociado en la plataforma. Contacta al administrador.');
         setLoading(false);
         return;
       }
@@ -47,8 +53,8 @@ export default function LoginPage() {
       login(profile);
       toast.success('Bienvenido de vuelta');
       navigate('/app/dashboard');
-    } catch {
-      setError('No se pudo cargar tu perfil. Revisa los permisos de la BD.');
+    } catch (err) {
+      setError(`No se pudo cargar el perfil: ${err instanceof Error ? err.message : 'error desconocido'}`);
     }
     setLoading(false);
   };
