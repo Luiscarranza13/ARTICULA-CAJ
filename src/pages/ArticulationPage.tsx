@@ -58,11 +58,13 @@ export default function ArticulationPage() {
     };
   }, []);
 
+  const visiblePubs = useMemo(() => publications.filter((pub) => !pub.titulo?.startsWith('SOLICITUD:')), [publications]);
+
   const filteredPubs = useMemo(() => activeTab === 'oportunidades'
-    ? publications.filter((pub) => pub.tipo === 'oportunidad')
+    ? visiblePubs.filter((pub) => pub.tipo === 'oportunidad')
     : activeTab === 'eventos'
-      ? publications.filter((pub) => ['convocatoria', 'evento'].includes(pub.tipo))
-      : publications, [activeTab, publications]);
+      ? visiblePubs.filter((pub) => ['convocatoria', 'evento'].includes(pub.tipo))
+      : visiblePubs, [activeTab, visiblePubs]);
 
   const resetForm = () => {
     setTipo('publicacion');
@@ -207,8 +209,8 @@ export default function ArticulationPage() {
           <h3 className="font-display font-semibold text-surface-900 mb-4">Actividad en vivo</h3>
           <div className="space-y-3 text-sm">
             <Metric icon={Users} label="Actores" value={actores.length} />
-            <Metric icon={Briefcase} label="Oportunidades" value={publications.filter((pub) => pub.tipo === 'oportunidad').length} />
-            <Metric icon={Bell} label="Convocatorias" value={publications.filter((pub) => ['convocatoria', 'evento'].includes(pub.tipo)).length} />
+            <Metric icon={Briefcase} label="Oportunidades" value={visiblePubs.filter((pub) => pub.tipo === 'oportunidad').length} />
+            <Metric icon={Bell} label="Convocatorias" value={visiblePubs.filter((pub) => ['convocatoria', 'evento'].includes(pub.tipo)).length} />
           </div>
         </div>
       </div>
