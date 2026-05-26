@@ -2,12 +2,13 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ShoppingBag, BarChart3,
   Newspaper, Settings, LogOut, ChevronLeft, ChevronRight, Leaf,
-  Inbox, HelpCircle, Link2
+  Inbox, HelpCircle, Link2, UserCog
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { classNames, initials } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { canAccessRoute } from '../../lib/permissions';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/app/dashboard' },
@@ -20,6 +21,7 @@ const navItems = [
 
 const bottomItems = [
   { label: 'Solicitudes', icon: Inbox, path: '/app/admin' },
+  { label: 'Usuarios', icon: UserCog, path: '/app/usuarios' },
   { label: 'Configuración', icon: Settings, path: '/app/configuracion' },
   { label: 'Ayuda', icon: HelpCircle, path: '/app/ayuda' },
 ];
@@ -27,6 +29,8 @@ const bottomItems = [
 export default function Sidebar() {
   const location = useLocation();
   const { user, logout, sidebarCollapsed, toggleSidebarCollapsed } = useStore();
+  const visibleNavItems = navItems.filter((item) => canAccessRoute(user?.rol, item.path));
+  const visibleBottomItems = bottomItems.filter((item) => canAccessRoute(user?.rol, item.path));
 
   const isActive = (path: string) => location.pathname === path;
   const handleLogout = async () => {
@@ -90,7 +94,7 @@ export default function Sidebar() {
         )}
 
         <div className="space-y-0.5">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = isActive(item.path);
             return (
               <Link
@@ -129,7 +133,7 @@ export default function Sidebar() {
         <div className="border-t border-surface-100 my-3" />
 
         <div className="space-y-0.5">
-          {bottomItems.map((item) => {
+          {visibleBottomItems.map((item) => {
             const active = isActive(item.path);
             return (
               <Link

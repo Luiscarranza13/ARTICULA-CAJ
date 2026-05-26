@@ -11,6 +11,7 @@ import ArticulationPage from './pages/ArticulationPage'
 import AdminContactPage from './pages/AdminContactPage'
 import IndicatorsPage from './pages/IndicatorsPage'
 import ContentPage from './pages/ContentPage'
+import AdminUsersPage from './pages/AdminUsersPage'
 import SettingsPage from './pages/SettingsPage'
 import HelpPage from './pages/HelpPage'
 import LuisPage from './pages/LuisPage'
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="indicadores" element={<IndicatorsPage />} />
           <Route path="contenidos" element={<ContentPage />} />
           <Route path="admin" element={<AdminContactPage />} />
+          <Route path="usuarios" element={<AdminUsersPage />} />
           <Route path="configuracion" element={<SettingsPage />} />
           <Route path="ayuda" element={<HelpPage />} />
         </Route>

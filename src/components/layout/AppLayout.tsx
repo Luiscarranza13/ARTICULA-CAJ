@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useLocation } from 'react-router-dom';
 import { classNames } from '../../lib/utils';
+import { canAccessRoute, firstRouteForRole } from '../../lib/permissions';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/app/dashboard': { title: 'Dashboard', subtitle: 'Resumen de la plataforma' },
@@ -14,12 +15,13 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/app/indicadores': { title: 'Indicadores', subtitle: 'Analítica y KPIs regionales' },
   '/app/contenidos': { title: 'Contenidos', subtitle: 'Noticias, eventos y convocatorias' },
   '/app/admin': { title: 'Solicitudes', subtitle: 'Gestión de contacto y adquisición de productos' },
+  '/app/usuarios': { title: 'Usuarios', subtitle: 'Cuentas, roles y credenciales de acceso' },
   '/app/configuracion': { title: 'Configuración', subtitle: 'Ajustes de tu cuenta' },
   '/app/ayuda': { title: 'Ayuda', subtitle: 'Soporte y guias de uso' },
 };
 
 export default function AppLayout() {
-  const { isAuthenticated, isAuthLoading, sidebarCollapsed } = useStore();
+  const { isAuthenticated, isAuthLoading, sidebarCollapsed, user } = useStore();
   const location = useLocation();
 
   if (isAuthLoading) {
@@ -31,6 +33,9 @@ export default function AppLayout() {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!canAccessRoute(user?.rol, location.pathname)) {
+    return <Navigate to={firstRouteForRole(user?.rol)} replace />;
+  }
 
   const page = pageTitles[location.pathname] ?? { title: 'ARTICULA CAJ', subtitle: '' };
   return (

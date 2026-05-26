@@ -103,8 +103,8 @@ export default function LandingPage() {
   const [testimonioIndex, setTestimonioIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [contactTab, setContactTab] = useState<'contacto' | 'adquisicion'>('contacto');
-  const [contactForm, setContactForm] = useState({ nombre: '', email: '', telefono: '', mensaje: '' });
-  const [adqForm, setAdqForm] = useState({ nombre: '', email: '', telefono: '', empresa: '', producto: '', cadena: '', cantidad: '', presupuesto: '', mensaje: '' });
+  const [contactForm, setContactForm] = useState({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', mensaje: '' });
+  const [adqForm, setAdqForm] = useState({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', empresa: '', producto: '', cadena: '', cantidad: '', presupuesto: '', mensaje: '' });
   const [sending, setSending] = useState(false);
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -145,7 +145,7 @@ export default function LandingPage() {
     setSending(true);
     try {
       await submitSolicitud({ tipo: 'contacto', ...contactForm });
-      setContactForm({ nombre: '', email: '', telefono: '', mensaje: '' });
+      setContactForm({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', mensaje: '' });
       toast.success('Mensaje enviado. Te responderemos pronto.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo enviar la solicitud.');
@@ -158,7 +158,7 @@ export default function LandingPage() {
     setSending(true);
     try {
       await submitSolicitud({ tipo: 'adquisicion', ...adqForm });
-      setAdqForm({ nombre: '', email: '', telefono: '', empresa: '', producto: '', cadena: '', cantidad: '', presupuesto: '', mensaje: '' });
+      setAdqForm({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', empresa: '', producto: '', cadena: '', cantidad: '', presupuesto: '', mensaje: '' });
       toast.success('Solicitud de adquisición enviada. Te contactaremos a la brevedad.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo enviar la solicitud.');
@@ -600,6 +600,21 @@ export default function LandingPage() {
                     <input className="input-field" placeholder="+51 ..." value={contactForm.telefono}
                       onChange={(e) => setContactForm((f) => ({ ...f, telefono: e.target.value }))} />
                   </div>
+                  <div>
+                    <label className="label">DNI</label>
+                    <input className="input-field" inputMode="numeric" placeholder="Ej: 60280906" value={contactForm.dni}
+                      onChange={(e) => setContactForm((f) => ({ ...f, dni: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Organización</label>
+                    <input className="input-field" placeholder="Empresa, asociación o institución" value={contactForm.organizacion}
+                      onChange={(e) => setContactForm((f) => ({ ...f, organizacion: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Rubro</label>
+                    <input className="input-field" placeholder="Ej: Café, lácteos, turismo" value={contactForm.rubro}
+                      onChange={(e) => setContactForm((f) => ({ ...f, rubro: e.target.value }))} />
+                  </div>
                   <div className="md:col-span-2">
                     <label className="label">Mensaje *</label>
                     <textarea required rows={4} className="input-field resize-none" placeholder="¿En qué podemos ayudarte?" value={contactForm.mensaje}
@@ -629,9 +644,19 @@ export default function LandingPage() {
                       onChange={(e) => setAdqForm((f) => ({ ...f, telefono: e.target.value }))} />
                   </div>
                   <div>
+                    <label className="label">DNI</label>
+                    <input className="input-field" inputMode="numeric" placeholder="Ej: 60280906" value={adqForm.dni}
+                      onChange={(e) => setAdqForm((f) => ({ ...f, dni: e.target.value }))} />
+                  </div>
+                  <div>
                     <label className="label">Empresa / Organización</label>
                     <input className="input-field" placeholder="Nombre de tu empresa" value={adqForm.empresa}
-                      onChange={(e) => setAdqForm((f) => ({ ...f, empresa: e.target.value }))} />
+                      onChange={(e) => setAdqForm((f) => ({ ...f, empresa: e.target.value, organizacion: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Rubro</label>
+                    <input className="input-field" placeholder="Ej: Agroindustria, comercio" value={adqForm.rubro}
+                      onChange={(e) => setAdqForm((f) => ({ ...f, rubro: e.target.value }))} />
                   </div>
                   <div>
                     <label htmlFor="adq-cadena" className="label">Cadena productiva *</label>

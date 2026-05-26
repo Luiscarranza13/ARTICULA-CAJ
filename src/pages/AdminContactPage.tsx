@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, Clock, Mail, RefreshCw, Search, Shield, Trash2, XCircle,
   MessageSquare, Star, Plus, Pencil, X, Eye, EyeOff, GripVertical, Quote,
   Settings, Users, Package, Network, TrendingUp, Phone, MapPin, Save,
+  KeyRound, Copy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Badge from '../components/common/Badge';
+import { createAdminUser, type AdminUserInput } from '../lib/adminUsers';
+import { sendCredentialEmail } from '../lib/gmail';
 import { deleteSolicitud, fetchSolicitudes, updateSolicitudEstado, type SolicitudWeb } from '../lib/solicitudes';
 import { supabase } from '../lib/supabase';
-import { classNames, timeAgo } from '../lib/utils';
+import { classNames, getRolLabel, timeAgo } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import type { Testimonio, SiteConfig } from '../types';
+import type { Testimonio, SiteConfig, UserRole } from '../types';
 
 type TabId = 'solicitudes' | 'testimonios' | 'configuracion';
 
@@ -24,6 +28,19 @@ const TESTIMONIO_EMPTY: Omit<Testimonio, 'id' | 'createdAt'> = {
   rating: 5,
   activo: true,
   orden: 0,
+};
+
+type CredentialForm = {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  celular: string;
+  correo: string;
+  organizacion: string;
+  ubicacion: string;
+  rubro: string;
+  rol: UserRole;
+  password: string;
 };
 
 export default function AdminContactPage() {
@@ -43,6 +60,8 @@ export default function AdminContactPage() {
   const [estado, setEstado] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SolicitudWeb | null>(null);
+  const [credentialSolicitud, setCredentialSolicitud] = useState<SolicitudWeb | null>(null);
+  const [credentialSaving, setCredentialSaving] = useState(false);
 
   // Testimonios state
   const [testimonioModal, setTestimonioModal] = useState<{ open: boolean; item: Testimonio | null }>({ open: false, item: null });
@@ -98,6 +117,49 @@ export default function AdminContactPage() {
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
+    }
+  };
+
+  const createCredentialsFromSolicitud = async (form: CredentialForm) => {
+    if (!credentialSolicitud) return;
+    setCredentialSaving(true);
+    try {
+      const userInput: AdminUserInput = {
+        nombre: form.nombre,
+        apellido: form.apellido,
+        dni: form.dni,
+        celular: form.celular,
+        correo: form.correo,
+        organizacion: form.organizacion,
+        ubicacion: form.ubicacion,
+        rubro: form.rubro,
+        rol: form.rol,
+        password: form.password,
+        verified: true,
+        estado: 'aprobado',
+      };
+      const created = await createAdminUser(userInput);
+      const payload = {
+        to: form.correo,
+        nombre: `${created.nombre} ${created.apellido}`.trim() || form.correo,
+        email: form.correo,
+        password: form.password,
+        loginUrl: 'https://articulacaj.novatec.ink/login',
+        supportEmail: siteConfig.email,
+        supportPhone: siteConfig.telefono,
+        supportAddress: siteConfig.direccion,
+      };
+
+      await sendCredentialEmail(payload);
+      toast.success('Usuario creado y credenciales enviadas automaticamente');
+
+      setCredentialSolicitud(null);
+      await updateSolicitudEstado(credentialSolicitud.id, 'aprobado');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudieron crear las credenciales');
+    } finally {
+      setCredentialSaving(false);
     }
   };
 
@@ -218,6 +280,21 @@ export default function AdminContactPage() {
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button type="button" className="btn-secondary px-3 py-1.5 text-xs" onClick={() => setSelected(item)}>Ver</button>
+                            <button
+                              type="button"
+                              className={classNames(
+                                'inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors',
+                                item.estado === 'aprobado'
+                                  ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                  : 'bg-surface-100 text-surface-300 cursor-not-allowed'
+                              )}
+                              aria-label="Crear credenciales"
+                              disabled={item.estado !== 'aprobado'}
+                              onClick={() => setCredentialSolicitud(item)}
+                              title={item.estado === 'aprobado' ? 'Crear credenciales' : 'Aprueba la solicitud antes de crear credenciales'}
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
                             <button type="button" aria-label="Eliminar solicitud"
                               className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
                               onClick={() => removeSolicitud(item.id)}>
@@ -444,6 +521,11 @@ export default function AdminContactPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={selected.tipo === 'adquisicion' ? 'emerald' : 'blue'}>{selected.tipo}</Badge>
+                    {selected.estado === 'aprobado' && (
+                      <button type="button" onClick={() => { setCredentialSolicitud(selected); setSelected(null); }} className="btn-primary px-3 py-1.5 text-xs">
+                        <KeyRound className="w-3.5 h-3.5" /> Credenciales
+                      </button>
+                    )}
                     <button type="button" aria-label="Cerrar" onClick={() => setSelected(null)} className="w-8 h-8 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-400">
                       <X className="w-4 h-4" />
                     </button>
@@ -470,6 +552,17 @@ export default function AdminContactPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {credentialSolicitud && (
+          <CredentialModal
+            solicitud={credentialSolicitud}
+            saving={credentialSaving}
+            onClose={() => setCredentialSolicitud(null)}
+            onSubmit={createCredentialsFromSolicitud}
+          />
         )}
       </AnimatePresence>
 
@@ -622,6 +715,139 @@ function StatCard({ label, value, icon: Icon, color = 'text-surface-700 bg-surfa
   );
 }
 
+function CredentialModal({ solicitud, saving, onClose, onSubmit }: {
+  solicitud: SolicitudWeb;
+  saving: boolean;
+  onClose: () => void;
+  onSubmit: (form: CredentialForm) => void;
+}) {
+  const [form, setForm] = useState<CredentialForm>(() => {
+    const [nombre, ...apellidoParts] = solicitud.nombre.trim().split(/\s+/);
+    return {
+      nombre: nombre || solicitud.nombre,
+      apellido: apellidoParts.join(' '),
+      dni: solicitud.dni ?? '',
+      celular: solicitud.telefono ?? '',
+      correo: solicitud.email,
+      organizacion: solicitud.organizacion ?? solicitud.empresa ?? solicitud.cadena ?? '',
+      ubicacion: 'Cajamarca',
+      rubro: solicitud.rubro ?? solicitud.producto ?? solicitud.cadena ?? '',
+      rol: solicitud.tipo === 'adquisicion' ? 'comprador' : 'productor',
+      password: generateCredentialPassword(),
+    };
+  });
+  const [showPassword, setShowPassword] = useState(false);
+
+  const set = (field: keyof CredentialForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form.nombre.trim() || !form.correo.trim()) {
+      toast.error('Nombre y correo son obligatorios');
+      return;
+    }
+    if (form.password.length < 8) {
+      toast.error('La contrasena debe tener al menos 8 caracteres');
+      return;
+    }
+    onSubmit(form);
+  };
+
+  return createPortal(
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 32 }}
+        className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
+        <form onSubmit={submit} className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-3xl pointer-events-auto max-h-[calc(100vh-32px)] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-surface-100 flex-shrink-0">
+            <div>
+              <h3 className="font-display text-lg font-bold text-surface-900">Crear credenciales</h3>
+              <p className="text-xs text-surface-400">Solicitud aprobada de {solicitud.email}</p>
+            </div>
+            <button type="button" aria-label="Cerrar" onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-400">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="overflow-y-auto flex-1 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CredentialField label="Nombre *" value={form.nombre} onChange={(value) => set('nombre', value)} />
+            <CredentialField label="Apellido" value={form.apellido} onChange={(value) => set('apellido', value)} />
+            <CredentialField label="DNI" value={form.dni} onChange={(value) => set('dni', value)} />
+            <CredentialField label="Celular" value={form.celular} onChange={(value) => set('celular', value)} />
+            <CredentialField label="Correo Gmail *" type="email" value={form.correo} onChange={(value) => set('correo', value)} />
+            <div>
+              <label htmlFor="credential-rol" className="label">Rol</label>
+              <select id="credential-rol" className="input-field" value={form.rol} onChange={(event) => set('rol', event.target.value)}>
+                {(['productor', 'comprador', 'institucion', 'administrador'] as UserRole[]).map((rol) => (
+                  <option key={rol} value={rol}>{getRolLabel(rol)}</option>
+                ))}
+              </select>
+            </div>
+            <CredentialField label="Organizacion" value={form.organizacion} onChange={(value) => set('organizacion', value)} />
+            <CredentialField label="Ubicacion" value={form.ubicacion} onChange={(value) => set('ubicacion', value)} />
+            <div className="sm:col-span-2">
+              <CredentialField label="Rubro" value={form.rubro} onChange={(value) => set('rubro', value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="credential-password" className="label">Contrasena *</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    id="credential-password"
+                    type={showPassword ? 'text' : 'password'}
+                    className="input-field pr-10"
+                    value={form.password}
+                    onChange={(event) => set('password', event.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <button type="button" aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'} onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button type="button" onClick={() => set('password', generateCredentialPassword())} className="btn-secondary px-3" title="Generar contrasena">
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-surface-400 mt-2">Al guardar se crea el usuario y se envia el acceso al correo indicado mediante Gmail API.</p>
+            </div>
+          </div>
+
+          <div className="border-t border-surface-100 p-5 flex flex-col sm:flex-row gap-3 sm:justify-end flex-shrink-0 bg-white">
+            <button type="button" onClick={onClose} className="btn-secondary justify-center">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn-primary justify-center disabled:opacity-60">
+              {saving ? 'Creando...' : 'Crear y enviar'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </>,
+    document.body
+  );
+}
+
+function CredentialField({ label, value, onChange, type = 'text' }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  const id = `credential-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  return (
+    <div>
+      <label htmlFor={id} className="label">{label}</label>
+      <input id={id} type={type} className="input-field" value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+function generateCredentialPassword() {
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return `Caj-${Array.from(bytes, (byte) => byte.toString(36).padStart(2, '0')).join('').slice(0, 12)}!`;
+}
+
 function EstadoSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <select aria-label="Estado de la solicitud" className="input-field py-1.5 text-xs w-32" value={value} onChange={(e) => onChange(e.target.value)}>
@@ -657,4 +883,3 @@ function ConfigStatField({ label, value, onChange, prefix, suffix, icon: Icon }:
     </div>
   );
 }
-

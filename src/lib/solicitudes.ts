@@ -6,7 +6,10 @@ export type SolicitudWeb = {
   tipo: 'contacto' | 'adquisicion';
   nombre: string;
   email: string;
+  dni?: string;
   telefono?: string;
+  organizacion?: string;
+  rubro?: string;
   empresa?: string;
   producto?: string;
   cadena?: string;
@@ -63,7 +66,10 @@ export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {
       tipo: parsed.tipo ?? 'contacto',
       nombre: parsed.nombre ?? '',
       email: parsed.email ?? '',
+      dni: parsed.dni,
       telefono: parsed.telefono,
+      organizacion: parsed.organizacion,
+      rubro: parsed.rubro,
       empresa: parsed.empresa,
       producto: parsed.producto,
       cadena: parsed.cadena,
