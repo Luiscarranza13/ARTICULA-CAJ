@@ -158,8 +158,12 @@ export default function Sidebar() {
       {/* User Profile */}
       <div className="border-t border-surface-100 p-3">
         <div className={classNames('flex items-center gap-3 p-2 rounded-xl hover:bg-surface-50 transition-colors cursor-pointer', sidebarCollapsed && 'justify-center')}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold shadow-sm">
-            {user ? initials(user.nombre, user.apellido) : 'U'}
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold shadow-sm overflow-hidden">
+            {user?.avatar ? (
+              <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user ? initials(user.nombre, user.apellido) : 'U'
+            )}
           </div>
           <AnimatePresence>
             {!sidebarCollapsed && (
