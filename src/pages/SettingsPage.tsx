@@ -36,7 +36,8 @@ export default function SettingsPage() {
           .from('avatars')
           .upload(path, avatarFile, { upsert: true });
         if (uploadError) {
-          toast.error('No se pudo subir la foto. Verifica la configuración de storage.');
+          console.error('Storage upload error:', uploadError);
+          toast.error(`No se pudo subir la foto: ${uploadError.message}`);
         } else {
           const { data } = supabase.storage.from('avatars').getPublicUrl(path);
           avatar = data.publicUrl;
@@ -55,7 +56,7 @@ export default function SettingsPage() {
       };
 
       if (user?.id) {
-        await supabase.from('perfiles').update({
+        const { error: updateError } = await supabase.from('perfiles').update({
           nombre: updates.nombre,
           apellido: updates.apellido,
           celular: updates.celular,
@@ -65,6 +66,12 @@ export default function SettingsPage() {
           bio: updates.bio,
           avatar_url: avatar ?? null,
         }).eq('id', user.id);
+        if (updateError) {
+          console.error('Profile update error:', updateError);
+          toast.error(`Error al guardar perfil: ${updateError.message}`);
+          setSaving(false);
+          return;
+        }
       }
 
       updateUser(updates);
