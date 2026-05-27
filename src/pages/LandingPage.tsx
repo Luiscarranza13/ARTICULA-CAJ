@@ -250,6 +250,7 @@ export default function LandingPage() {
             {[
               { label: 'Plataforma', href: '#plataforma' },
               { label: 'Cadenas', href: '#cadenas' },
+              { label: 'Productos', href: '/productos' },
               { label: 'Cómo funciona', href: '#como-funciona' },
               { label: 'Testimonios', href: '#testimonios' },
             ].map(({ label, href }) => (
@@ -277,7 +278,7 @@ export default function LandingPage() {
         {menuOpen && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             className="md:hidden bg-white border-t border-surface-100 px-6 py-4 space-y-1">
-            {[{ label: 'Plataforma', href: '#plataforma' }, { label: 'Cadenas', href: '#cadenas' }, { label: 'Cómo funciona', href: '#como-funciona' }, { label: 'Testimonios', href: '#testimonios' }].map(({ label, href }) => (
+            {[{ label: 'Plataforma', href: '#plataforma' }, { label: 'Cadenas', href: '#cadenas' }, { label: 'Productos', href: '/productos' }, { label: 'Cómo funciona', href: '#como-funciona' }, { label: 'Testimonios', href: '#testimonios' }].map(({ label, href }) => (
               <a key={label} href={href} onClick={() => setMenuOpen(false)}
                 className="block text-sm font-medium text-surface-600 py-2.5 hover:text-emerald-700">{label}</a>
             ))}
@@ -620,6 +621,33 @@ export default function LandingPage() {
       </section>
 
       {/* CONTACTO Y ADQUISICIÓN */}
+      <section className="py-20 bg-white border-b border-surface-100">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-12 items-start">
+          <div>
+            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Quiénes somos</span>
+            <h2 className="section-title mb-4">Una plataforma pública para articular oportunidades productivas</h2>
+            <p className="section-subtitle">ARTICULA CAJ organiza información de actores, productos, cadenas y solicitudes para que productores, compradores e instituciones trabajen con datos actualizados desde el panel.</p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to="/productos" className="btn-primary">Ver productos <ArrowRight className="w-4 h-4" /></Link>
+              <a href="#contacto" className="btn-secondary">Contactar equipo</a>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              ['Datos en tiempo real', 'Las cifras públicas se sincronizan con Supabase y reflejan el panel.'],
+              ['Solicitudes trazables', 'Cada contacto o adquisición queda registrado para seguimiento administrativo.'],
+              ['Vitrina pública', 'Los compradores pueden explorar productos disponibles sin iniciar sesión.'],
+              ['Acceso controlado', 'Las credenciales se emiten solo a usuarios aprobados por administración.'],
+            ].map(([title, text]) => (
+              <div key={title} className="rounded-2xl border border-surface-200 bg-surface-50 p-5">
+                <h3 className="font-display font-bold text-surface-900 mb-2">{title}</h3>
+                <p className="text-sm text-surface-500 leading-relaxed">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="contacto" className="py-24 bg-surface-50">
         <div className="max-w-5xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-12">
@@ -760,6 +788,28 @@ export default function LandingPage() {
               )}
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      <section className="py-20 bg-surface-50 border-y border-surface-100">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Preguntas frecuentes</span>
+            <h2 className="section-title">Respuestas rápidas para empezar</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              ['¿Quién puede registrarse?', 'Productores, compradores e instituciones vinculadas a cadenas productivas de Cajamarca.'],
+              ['¿El acceso es inmediato?', 'No. Administración revisa la solicitud y envía credenciales por correo al aprobarla.'],
+              ['¿Puedo ver productos sin cuenta?', 'Sí. La vitrina pública permite explorar productos disponibles antes de iniciar sesión.'],
+              ['¿Los datos de la web son reales?', 'Sí. Las cifras públicas se actualizan desde las tablas y vistas del panel.'],
+            ].map(([question, answer]) => (
+              <div key={question} className="rounded-2xl border border-surface-200 bg-white p-5">
+                <h3 className="font-semibold text-surface-900 mb-2">{question}</h3>
+                <p className="text-sm text-surface-500 leading-relaxed">{answer}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -1,23 +1,26 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
+import { Analytics } from '@vercel/analytics/react'
 import AppLayout from './components/layout/AppLayout'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import DashboardPage from './pages/DashboardPage'
-import DirectoryPage from './pages/DirectoryPage'
-import MarketplacePage from './pages/MarketplacePage'
-import ArticulationPage from './pages/ArticulationPage'
-import AdminContactPage from './pages/AdminContactPage'
-import IndicatorsPage from './pages/IndicatorsPage'
-import ContentPage from './pages/ContentPage'
-import AdminUsersPage from './pages/AdminUsersPage'
-import SettingsPage from './pages/SettingsPage'
-import HelpPage from './pages/HelpPage'
 import LuisPage from './pages/LuisPage'
 import { useStore } from './store/useStore'
 import { getCurrentProfile, supabase } from './lib/supabase'
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const DirectoryPage = lazy(() => import('./pages/DirectoryPage'))
+const MarketplacePage = lazy(() => import('./pages/MarketplacePage'))
+const PublicMarketplacePage = lazy(() => import('./pages/PublicMarketplacePage'))
+const ArticulationPage = lazy(() => import('./pages/ArticulationPage'))
+const AdminContactPage = lazy(() => import('./pages/AdminContactPage'))
+const IndicatorsPage = lazy(() => import('./pages/IndicatorsPage'))
+const ContentPage = lazy(() => import('./pages/ContentPage'))
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const HelpPage = lazy(() => import('./pages/HelpPage'))
 
 export default function App() {
   const login = useStore((state) => state.login);
@@ -66,9 +69,12 @@ export default function App() {
       <ThemeManager />
       <LuisModeManager />
       <Toaster position="top-right" />
+      <Analytics />
+      <Suspense fallback={<div className="min-h-screen bg-surface-50 flex items-center justify-center text-surface-500">Cargando...</div>}>
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/productos" element={<PublicMarketplacePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/luis" element={<LuisPage />} />
@@ -91,6 +97,7 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }
