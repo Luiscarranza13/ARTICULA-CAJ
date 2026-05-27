@@ -65,6 +65,23 @@ type EventRow = {
   categoria: string | null;
 };
 
+export type PublicLandingKpis = {
+  productores_activos?: number | null;
+  productos_publicados?: number | null;
+  acuerdos_comerciales?: number | null;
+  ventas_cerradas?: number | null;
+};
+
+export type PublicLandingCadena = {
+  id: string;
+  nombre: string;
+  categoria: string | null;
+  estado?: string | null;
+  actores: number | null;
+  volumen_anual: number | null;
+  impacto_economico: number | null;
+};
+
 const fallbackImage = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80';
 
 export async function fetchDashboardData() {
@@ -82,6 +99,24 @@ export async function fetchDashboardData() {
     cadenas: cadenas.data ?? [],
     publicaciones,
     eventos,
+  };
+}
+
+export async function fetchPublicLandingData() {
+  const [kpis, cadenas] = await Promise.all([
+    supabase.from('v_dashboard_kpis').select('*').maybeSingle(),
+    supabase
+      .from('v_cadenas_resumen')
+      .select('id,nombre,categoria,estado,actores,volumen_anual,impacto_economico')
+      .order('actores', { ascending: false }),
+  ]);
+
+  if (kpis.error) throw kpis.error;
+  if (cadenas.error) throw cadenas.error;
+
+  return {
+    kpis: (kpis.data ?? {}) as PublicLandingKpis,
+    cadenas: (cadenas.data ?? []) as PublicLandingCadena[],
   };
 }
 

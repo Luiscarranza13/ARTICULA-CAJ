@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import type { Variants } from 'framer-motion';
@@ -12,9 +12,11 @@ import {
 import type { ComponentType } from 'react';
 import AnimatedCounter from '../components/common/AnimatedCounter';
 import toast from 'react-hot-toast';
+import { fetchPublicLandingData, type PublicLandingCadena, type PublicLandingKpis } from '../lib/data';
 import { submitSolicitudAndNotify } from '../lib/solicitudes';
+import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
-import type { Testimonio } from '../types';
+import type { SiteConfig, Testimonio } from '../types';
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
@@ -28,6 +30,35 @@ const cadenas: { icon: ComponentType<{ className?: string }>; nombre: string; de
   { icon: Wheat,    nombre: 'Quinua',             desc: 'Cajamarca, Celendín',            actores: '310+',   color: 'from-emerald-50 to-emerald-100 border-emerald-200', iconBg: 'bg-emerald-600' },
   { icon: Sprout,   nombre: 'Tubérculos Nativos', desc: 'Celendín, Bambamarca, Chota',   actores: '680+',   color: 'from-orange-50 to-orange-100 border-orange-200',    iconBg: 'bg-orange-500' },
   { icon: Hexagon,  nombre: 'Apicultura',         desc: 'San Marcos, Cajabamba',          actores: '145+',   color: 'from-yellow-50 to-yellow-100 border-yellow-200',    iconBg: 'bg-yellow-500' },
+];
+
+type LandingCadenaCard = {
+  icon: ComponentType<{ className?: string }>;
+  nombre: string;
+  desc: string;
+  actores: string;
+  color: string;
+  iconBg: string;
+};
+
+type LandingStat = {
+  label: string;
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+  color: string;
+  bgColor: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+const cadenaStyles = [
+  { icon: Coffee, color: 'from-amber-50 to-amber-100 border-amber-200', iconBg: 'bg-amber-500' },
+  { icon: Droplets, color: 'from-blue-50 to-blue-100 border-blue-200', iconBg: 'bg-blue-500' },
+  { icon: Bean, color: 'from-amber-50 to-orange-100 border-orange-200', iconBg: 'bg-amber-800' },
+  { icon: Wheat, color: 'from-emerald-50 to-emerald-100 border-emerald-200', iconBg: 'bg-emerald-600' },
+  { icon: Sprout, color: 'from-orange-50 to-orange-100 border-orange-200', iconBg: 'bg-orange-500' },
+  { icon: Hexagon, color: 'from-yellow-50 to-yellow-100 border-yellow-200', iconBg: 'bg-yellow-500' },
 ];
 
 const pasos = [
@@ -90,13 +121,10 @@ function TestimonioCard({ t, featured = false }: { t: Testimonio; featured?: boo
 
 export default function LandingPage() {
   const { testimonios, siteConfig } = useStore();
+  const [landingKpis, setLandingKpis] = useState<PublicLandingKpis | null>(null);
+  const [landingCadenas, setLandingCadenas] = useState<LandingCadenaCard[]>(cadenas);
 
-  const stats = [
-    { label: 'Actores Registrados', value: siteConfig.actoresCount, suffix: '+', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: Users },
-    { label: 'Productos en Vitrina', value: siteConfig.productosCount, suffix: '', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Package },
-    { label: 'Acuerdos Comerciales', value: siteConfig.acuerdosCount, suffix: '+', color: 'text-purple-600', bgColor: 'bg-purple-50', icon: Network },
-    { label: 'Impacto en Ventas', value: siteConfig.ventasImpacto, prefix: 'S/ ', suffix: 'M', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: TrendingUp },
-];
+  const stats = buildLandingStats(landingKpis, siteConfig);
   const activeTestimonios = testimonios.filter((t) => t.activo).sort((a, b) => a.orden - b.orden);
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,25 +146,55 @@ export default function LandingPage() {
     return () => unsub();
   }, [scrollY]);
 
-  const navigateTestimonio = useCallback((dir: number) => {
+  const navigateTestimonio = (dir: number) => {
     const n = activeTestimonios.length;
     if (n === 0) return;
     setTestimonioIndex((i) => (i + dir + n) % n);
-  }, [activeTestimonios.length]);
+  };
 
   useEffect(() => {
     if (autoPlayRef.current) clearInterval(autoPlayRef.current);
     if (!isAutoPlaying || activeTestimonios.length < 2) return;
-    autoPlayRef.current = setInterval(() => navigateTestimonio(1), 5000);
+    autoPlayRef.current = setInterval(() => {
+      const n = activeTestimonios.length;
+      setTestimonioIndex((i) => (i + 1 + n) % n);
+    }, 5000);
     return () => { if (autoPlayRef.current) clearInterval(autoPlayRef.current); };
-  }, [isAutoPlaying, navigateTestimonio, activeTestimonios.length]);
+  }, [isAutoPlaying, activeTestimonios.length]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCadenaIndex((c) => (c + 1) % cadenas.length), 4500);
+    const timer = window.setInterval(() => setCadenaIndex((c) => (c + 1) % landingCadenas.length), 4500);
     return () => window.clearInterval(timer);
+  }, [landingCadenas.length]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchPublicLandingData();
+        setLandingKpis(data.kpis);
+        setLandingCadenas(toLandingCadenas(data.cadenas));
+        setCadenaIndex((current) => Math.min(current, Math.max(data.cadenas.length - 1, 0)));
+      } catch (error) {
+        console.error('No se pudieron cargar estadisticas publicas', error);
+      }
+    };
+
+    queueMicrotask(() => void load());
+    const channel = supabase
+      .channel('landing-public-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'perfiles' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'actores' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'publicaciones' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cadenas_productivas' }, () => void load())
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
-  const visibleCadenas = Array.from({ length: 3 }, (_, i) => cadenas[(cadenaIndex + i) % cadenas.length]);
+  const visibleCadenas = Array.from({ length: Math.min(3, landingCadenas.length) }, (_, i) => landingCadenas[(cadenaIndex + i) % landingCadenas.length]);
   const partnerTrack = [...partners, ...partners];
   const n = activeTestimonios.length;
   const leftIdx = n > 0 ? (testimonioIndex - 1 + n) % n : 0;
@@ -292,7 +350,7 @@ export default function LandingPage() {
                   <img key={i} src={src} alt="" className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm" />
                 ))}
               </div>
-              <span>+{siteConfig.actoresCount.toLocaleString()} actores ya registrados en la plataforma</span>
+              <span>{Number(landingKpis?.productores_activos ?? 0).toLocaleString('es-PE')} productores activos en la plataforma</span>
             </motion.div>
           </div>
 
@@ -346,7 +404,7 @@ export default function LandingPage() {
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </div>
               <p className={`font-display text-3xl font-bold ${stat.color}`}>
-                <AnimatedCounter end={stat.value} prefix={stat.prefix} suffix={stat.suffix} />
+                <AnimatedCounter end={stat.value} prefix={stat.prefix} suffix={stat.suffix} decimals={stat.decimals} />
               </p>
               <p className="text-surface-500 text-sm mt-1">{stat.label}</p>
             </motion.div>
@@ -360,17 +418,17 @@ export default function LandingPage() {
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Cadenas Productivas</span>
             <h2 className="section-title mb-4">Las principales cadenas de Cajamarca</h2>
-            <p className="section-subtitle max-w-2xl mx-auto">Impulsamos 12 cadenas productivas con más de {siteConfig.actoresCount.toLocaleString()} actores y S/ {siteConfig.ventasImpacto}M en ventas articuladas.</p>
+            <p className="section-subtitle max-w-2xl mx-auto">Datos actualizados desde el panel: {landingCadenas.length.toLocaleString('es-PE')} cadenas productivas, {Number(landingKpis?.productores_activos ?? 0).toLocaleString('es-PE')} productores activos y {formatSales(Number(landingKpis?.ventas_cerradas ?? 0))} en ventas cerradas.</p>
           </motion.div>
 
           <div className="mb-8 flex justify-center gap-3">
             <button type="button" aria-label="Cadena anterior"
-              onClick={() => setCadenaIndex((c) => (c - 1 + cadenas.length) % cadenas.length)}
+              onClick={() => setCadenaIndex((c) => (c - 1 + landingCadenas.length) % landingCadenas.length)}
               className="h-10 w-10 rounded-full border border-surface-200 bg-white text-surface-600 shadow-card transition hover:border-emerald-300 hover:text-emerald-700 flex items-center justify-center">
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button type="button" aria-label="Siguiente cadena"
-              onClick={() => setCadenaIndex((c) => (c + 1) % cadenas.length)}
+              onClick={() => setCadenaIndex((c) => (c + 1) % landingCadenas.length)}
               className="h-10 w-10 rounded-full border border-surface-200 bg-white text-surface-600 shadow-card transition hover:border-emerald-300 hover:text-emerald-700 flex items-center justify-center">
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -718,7 +776,7 @@ export default function LandingPage() {
             </div>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">¿Listo para articularte?</h2>
             <p className="text-emerald-300 text-lg mb-10 max-w-xl mx-auto">
-              Únete a más de {siteConfig.actoresCount.toLocaleString()} actores productivos de Cajamarca que ya están conectados, creciendo y exportando juntos.
+              Únete a los {Number(landingKpis?.productores_activos ?? 0).toLocaleString('es-PE')} productores activos de Cajamarca que ya están conectados, creciendo y articulando oportunidades.
             </p>
             <div className="flex flex-wrap justify-center gap-5 mb-12">
               {['Acceso revisado por administración', 'Credenciales por correo', 'Soporte en español', 'Datos de Cajamarca'].map((item) => (
@@ -794,4 +852,46 @@ export default function LandingPage() {
 
 function getNotificationEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : defaultContactEmail;
+}
+
+function buildLandingStats(kpis: PublicLandingKpis | null, fallback: SiteConfig): LandingStat[] {
+  const fallbackSales = fallback.ventasImpacto * 1_000_000;
+  const sales = Number(kpis?.ventas_cerradas ?? fallbackSales);
+  const salesInMillions = sales >= 1_000_000;
+
+  return [
+    { label: 'Productores Activos', value: Number(kpis?.productores_activos ?? fallback.actoresCount), color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: Users },
+    { label: 'Productos Publicados', value: Number(kpis?.productos_publicados ?? fallback.productosCount), color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Package },
+    { label: 'Acuerdos Comerciales', value: Number(kpis?.acuerdos_comerciales ?? fallback.acuerdosCount), color: 'text-purple-600', bgColor: 'bg-purple-50', icon: Network },
+    {
+      label: 'Ventas Cerradas',
+      value: salesInMillions ? sales / 1_000_000 : sales,
+      prefix: 'S/ ',
+      suffix: salesInMillions ? 'M' : '',
+      decimals: salesInMillions && sales % 1_000_000 !== 0 ? 1 : 0,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      icon: TrendingUp,
+    },
+  ];
+}
+
+function toLandingCadenas(rows: PublicLandingCadena[]): LandingCadenaCard[] {
+  if (rows.length === 0) return cadenas;
+
+  return rows.map((row, index) => {
+    const style = cadenaStyles[index % cadenaStyles.length];
+    const volume = Number(row.volumen_anual ?? 0);
+    return {
+      ...style,
+      nombre: row.nombre,
+      desc: [row.categoria, volume > 0 ? `${volume.toLocaleString('es-PE')} volumen anual` : null].filter(Boolean).join(' · ') || 'Cadena productiva',
+      actores: Number(row.actores ?? 0).toLocaleString('es-PE'),
+    };
+  });
+}
+
+function formatSales(value: number) {
+  if (value >= 1_000_000) return `S/ ${(value / 1_000_000).toLocaleString('es-PE', { maximumFractionDigits: 1 })}M`;
+  return `S/ ${value.toLocaleString('es-PE')}`;
 }
