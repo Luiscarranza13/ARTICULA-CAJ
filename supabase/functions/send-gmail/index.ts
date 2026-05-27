@@ -128,8 +128,12 @@ function formatAddress(value: string) {
 }
 
 function encodeHeader(value: string) {
-  if (/^[\x00-\x7F]*$/.test(value)) return value;
+  if (isAscii(value)) return value;
   return `=?UTF-8?B?${btoa(unescape(encodeURIComponent(value)))}?=`;
+}
+
+function isAscii(value: string) {
+  return Array.from(value).every((char) => char.charCodeAt(0) <= 0x7f);
 }
 
 function base64UrlEncode(value: string) {

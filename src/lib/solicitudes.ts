@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { sendPublicSolicitudConfirmationEmail } from './gmail';
 
 export type SolicitudWeb = {
   id: string;
@@ -24,6 +25,7 @@ type SolicitudPayload = Omit<SolicitudWeb, 'id' | 'estado' | 'createdAt'>;
 
 const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY as string | undefined;
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const sendGmailApiKey = import.meta.env.VITE_SEND_GMAIL_API_KEY as string | undefined;
 
 const adminClient = serviceKey && url
   ? createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -48,6 +50,54 @@ export async function submitSolicitud(payload: SolicitudPayload) {
   }
 
   throw error;
+}
+
+export async function submitSolicitudAndNotify(payload: SolicitudPayload, notifyTo: string) {
+  const edgeResult = await submitSolicitudViaEdge(payload, notifyTo);
+  if (edgeResult.ok) return;
+
+  const [saveResult, confirmationEmailResult] = await Promise.allSettled([
+    submitSolicitud(payload),
+    sendPublicSolicitudConfirmationEmail({
+      ...payload,
+      to: notifyTo,
+    }),
+  ]);
+
+  if (saveResult.status === 'rejected') {
+    console.error('No se pudo guardar la solicitud en Supabase', saveResult.reason);
+  }
+
+  if (confirmationEmailResult.status === 'rejected') {
+    throw confirmationEmailResult.reason;
+  }
+}
+
+async function submitSolicitudViaEdge(payload: SolicitudPayload, notifyTo: string) {
+  if (!url || !sendGmailApiKey) return { ok: false };
+
+  try {
+    const response = await fetch(`${url}/functions/v1/submit-solicitud`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': sendGmailApiKey,
+      },
+      body: JSON.stringify({ ...payload, notifyTo }),
+    });
+
+    if (response.status === 404) return { ok: false };
+
+    const data = await response.json().catch(() => null) as { error?: string } | null;
+    if (!response.ok || data?.error) {
+      throw new Error(data?.error || `No se pudo enviar la solicitud. HTTP ${response.status}`);
+    }
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof TypeError) return { ok: false };
+    throw error;
+  }
 }
 
 export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {

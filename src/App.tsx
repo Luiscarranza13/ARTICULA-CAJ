@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import AppLayout from './components/layout/AppLayout'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import DirectoryPage from './pages/DirectoryPage'
 import MarketplacePage from './pages/MarketplacePage'
@@ -69,6 +70,7 @@ export default function App() {
         {/* Rutas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/luis" element={<LuisPage />} />
 
         {/* Rutas protegidas */}
@@ -111,13 +113,21 @@ function LuisModeManager() {
   useEffect(() => {
     const disableAll = () => {
       Array.from(document.styleSheets).forEach((sheet) => {
-        try { sheet.disabled = true; } catch (_) { /* cross-origin, skip */ }
+        try {
+          sheet.disabled = true;
+        } catch {
+          // Some browser-managed stylesheets cannot be toggled.
+        }
       });
     };
 
     const enableAll = () => {
       Array.from(document.styleSheets).forEach((sheet) => {
-        try { sheet.disabled = false; } catch (_) {}
+        try {
+          sheet.disabled = false;
+        } catch {
+          // Some browser-managed stylesheets cannot be toggled.
+        }
       });
     };
 

@@ -10,9 +10,25 @@ export type CredentialEmailPayload = {
   supportAddress?: string;
 };
 
+export type PublicSolicitudEmailPayload = {
+  tipo: 'contacto' | 'adquisicion';
+  to: string;
+  nombre: string;
+  email: string;
+  dni?: string;
+  telefono?: string;
+  organizacion?: string;
+  rubro?: string;
+  mensaje: string;
+  empresa?: string;
+  producto?: string;
+  cadena?: string;
+  cantidad?: string;
+  presupuesto?: string;
+};
+
 const sendGmailApiKey = import.meta.env.VITE_SEND_GMAIL_API_KEY as string | undefined;
 const supabaseFunctionsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-gmail`;
-const configuredLogoUrl = import.meta.env.VITE_EMAIL_LOGO_URL as string | undefined;
 const defaultSupportEmail = 'info@articulacaj.pe';
 const defaultSupportPhone = '+51 076 365 000';
 const defaultSupportAddress = 'Cajamarca, Peru';
@@ -23,6 +39,48 @@ export async function sendCredentialEmail(payload: CredentialEmailPayload): Prom
   }
 
   const email = buildCredentialEmailContent(payload);
+  await sendHtmlEmail({
+    to: payload.to,
+    subject: email.subject,
+    text: email.text,
+    html: email.html,
+    replyTo: email.supportEmail,
+  });
+}
+
+export async function sendPublicSolicitudEmail(payload: PublicSolicitudEmailPayload): Promise<void> {
+  const email = buildPublicSolicitudEmailContent(payload);
+  await sendHtmlEmail({
+    to: payload.to,
+    subject: email.subject,
+    text: email.text,
+    html: email.html,
+    replyTo: payload.email,
+  });
+}
+
+export async function sendPublicSolicitudConfirmationEmail(payload: PublicSolicitudEmailPayload): Promise<void> {
+  const email = buildPublicSolicitudConfirmationEmailContent(payload);
+  await sendHtmlEmail({
+    to: payload.email,
+    subject: email.subject,
+    text: email.text,
+    html: email.html,
+    replyTo: payload.to,
+  });
+}
+
+async function sendHtmlEmail(payload: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  replyTo?: string;
+}) {
+  if (!sendGmailApiKey) {
+    throw new Error('Falta VITE_SEND_GMAIL_API_KEY para invocar send-gmail.');
+  }
+
   const response = await fetch(supabaseFunctionsUrl, {
     method: 'POST',
     headers: {
@@ -31,10 +89,10 @@ export async function sendCredentialEmail(payload: CredentialEmailPayload): Prom
     },
     body: JSON.stringify({
       to: payload.to,
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
-      replyTo: email.supportEmail,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+      replyTo: payload.replyTo,
     }),
   });
 
@@ -45,7 +103,6 @@ export async function sendCredentialEmail(payload: CredentialEmailPayload): Prom
 }
 
 export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
-  const logoUrl = payload.logoUrl || configuredLogoUrl || safeAbsoluteUrl('/favicon.svg');
   const supportEmail = payload.supportEmail || defaultSupportEmail;
   const supportPhone = payload.supportPhone || defaultSupportPhone;
   const supportAddress = payload.supportAddress || defaultSupportAddress;
@@ -87,17 +144,8 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <table role="presentation" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td align="center" style="width:58px;height:58px;background:#ffffff;border-radius:18px;">
-                            <span style="display:inline-block;width:38px;height:38px;border-radius:14px;background-color:#059669;background-image:linear-gradient(135deg,#34d399,#047857);color:#ffffff;font-size:20px;line-height:38px;font-weight:900;text-align:center;">A</span>
-                          </td>
-                          <td style="padding-left:14px;">
-                            <div style="font-size:19px;font-weight:900;line-height:1;letter-spacing:.02em;">ARTICULA CAJ</div>
-                            <div style="font-size:13px;line-height:1.4;color:#d1fae5;margin-top:6px;">Cadenas productivas conectadas</div>
-                          </td>
-                        </tr>
-                      </table>
+                      <div style="font-size:19px;font-weight:900;line-height:1;letter-spacing:.02em;">ARTICULA CAJ</div>
+                      <div style="font-size:13px;line-height:1.4;color:#d1fae5;margin-top:6px;">Cadenas productivas conectadas</div>
                     </td>
                     <td align="right" style="vertical-align:top;">
                       <span style="display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:8px 12px;color:#ecfdf5;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">Cuenta aprobada</span>
@@ -200,12 +248,158 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
   </body>
 </html>`;
 
-  return { subject, text, html, logoUrl, supportEmail, supportPhone, supportAddress };
+  return { subject, text, html, supportEmail, supportPhone, supportAddress };
 }
 
-function safeAbsoluteUrl(path: string) {
-  if (typeof window === 'undefined') return path;
-  return new URL(path, window.location.origin).toString();
+export function buildPublicSolicitudEmailContent(payload: PublicSolicitudEmailPayload) {
+  const title = payload.tipo === 'adquisicion' ? 'Nueva solicitud de adquisicion' : 'Nuevo mensaje de contacto';
+  const subject = `${title} - ${payload.nombre}`;
+  const fields = [
+    ['Nombre', payload.nombre],
+    ['Correo', payload.email],
+    ['DNI', payload.dni],
+    ['Telefono', payload.telefono],
+    ['Organizacion', payload.organizacion || payload.empresa],
+    ['Rubro', payload.rubro],
+    ['Cadena productiva', payload.cadena],
+    ['Producto', payload.producto],
+    ['Cantidad', payload.cantidad],
+    ['Presupuesto', payload.presupuesto],
+  ].filter(([, value]) => Boolean(value));
+
+  const text = [
+    title,
+    '',
+    ...fields.map(([label, value]) => `${label}: ${value}`),
+    '',
+    'Mensaje:',
+    payload.mensaje,
+  ].join('\n');
+
+  const rows = fields.map(([label, value]) => `
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">${escapeHtml(label ?? '')}</td>
+      <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:15px;font-weight:700;text-align:right;word-break:break-word;">${escapeHtml(value ?? '')}</td>
+    </tr>
+  `).join('');
+
+  const html = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#eef6f2;font-family:Segoe UI,Arial,sans-serif;color:#102033;">
+    <div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;">${escapeHtml(title)} desde la web de ARTICULA CAJ.</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef6f2;width:100%;">
+      <tr>
+        <td align="center" style="padding:32px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:700px;background:#ffffff;border:1px solid #dbe7e1;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24 0%,#047857 58%,#16a34a 100%);padding:30px;color:#ffffff;">
+                <div style="font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ</div>
+                <h1 style="margin:8px 0 8px;font-size:30px;line-height:1.16;font-weight:900;color:#ffffff;">${escapeHtml(title)}</h1>
+                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Se recibio una solicitud desde el formulario publico. Revisa los datos y responde al correo del solicitante.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 30px 12px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  ${rows}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 30px 30px;">
+                <div style="font-size:12px;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Mensaje</div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:18px 20px;color:#334155;font-size:15px;line-height:1.7;white-space:pre-wrap;">${escapeHtml(payload.mensaje)}</div>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin-top:20px;">
+                  <tr>
+                    <td bgcolor="#059669" style="border-radius:14px;">
+                      <a href="mailto:${encodeURIComponent(payload.email)}" style="display:inline-block;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:900;border-radius:14px;">Responder solicitud</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este correo fue enviado automaticamente por Gmail API desde ARTICULA CAJ.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { subject, text, html };
+}
+
+export function buildPublicSolicitudConfirmationEmailContent(payload: PublicSolicitudEmailPayload) {
+  const isAdquisicion = payload.tipo === 'adquisicion';
+  const title = isAdquisicion ? 'Recibimos tu solicitud de adquisicion' : 'Recibimos tu mensaje';
+  const subject = `${title} - ARTICULA CAJ`;
+  const safeName = escapeHtml(payload.nombre);
+  const detailRows = [
+    ['Tipo', isAdquisicion ? 'Solicitud de adquisicion' : 'Contacto general'],
+    ['Producto', payload.producto],
+    ['Cadena productiva', payload.cadena],
+  ].filter(([, value]) => Boolean(value));
+
+  const text = [
+    `Hola ${payload.nombre},`,
+    '',
+    'Recibimos tu solicitud en ARTICULA CAJ.',
+    'Nuestro equipo revisara la informacion y te contactara a la brevedad.',
+    '',
+    ...detailRows.map(([label, value]) => `${label}: ${value}`),
+  ].join('\n');
+
+  const rows = detailRows.map(([label, value]) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">${escapeHtml(label ?? '')}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;font-weight:700;text-align:right;word-break:break-word;">${escapeHtml(value ?? '')}</td>
+    </tr>
+  `).join('');
+
+  const html = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#eef6f2;font-family:Segoe UI,Arial,sans-serif;color:#102033;">
+    <div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;">ARTICULA CAJ recibio tu solicitud.</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef6f2;width:100%;">
+      <tr>
+        <td align="center" style="padding:32px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:680px;background:#ffffff;border:1px solid #dbe7e1;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24 0%,#047857 58%,#16a34a 100%);padding:30px;color:#ffffff;">
+                <div style="font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ</div>
+                <h1 style="margin:8px 0 8px;font-size:30px;line-height:1.16;font-weight:900;color:#ffffff;">${escapeHtml(title)}</h1>
+                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Hola, ${safeName}. Nuestro equipo revisara tu informacion y te contactara a la brevedad.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 30px 12px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows}</table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 30px 30px;">
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:18px 20px;color:#334155;font-size:15px;line-height:1.7;">Gracias por escribirnos. No necesitas responder este correo; nos contactaremos pronto por este medio.</div>
+                <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este correo confirma que tu formulario fue enviado correctamente desde ARTICULA CAJ.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { subject, text, html };
 }
 
 function escapeHtml(value: string) {

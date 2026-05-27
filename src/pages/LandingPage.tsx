@@ -12,7 +12,7 @@ import {
 import type { ComponentType } from 'react';
 import AnimatedCounter from '../components/common/AnimatedCounter';
 import toast from 'react-hot-toast';
-import { submitSolicitud } from '../lib/solicitudes';
+import { submitSolicitudAndNotify } from '../lib/solicitudes';
 import { useStore } from '../store/useStore';
 import type { Testimonio } from '../types';
 
@@ -54,6 +54,8 @@ const partners: { nombre: string; icon: ComponentType<{ className?: string }> }[
   { nombre: 'Sierra y Selva Exportadora',  icon: Package },
   { nombre: 'PRODUCE',                     icon: Cog },
 ];
+
+const defaultContactEmail = 'info@articulacaj.pe';
 
 function TestimonioCard({ t, featured = false }: { t: Testimonio; featured?: boolean }) {
   return (
@@ -144,7 +146,7 @@ export default function LandingPage() {
     e.preventDefault();
     setSending(true);
     try {
-      await submitSolicitud({ tipo: 'contacto', ...contactForm });
+      await submitSolicitudAndNotify({ tipo: 'contacto', ...contactForm }, getNotificationEmail(siteConfig.email));
       setContactForm({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', mensaje: '' });
       toast.success('Mensaje enviado. Te responderemos pronto.');
     } catch (error) {
@@ -157,7 +159,11 @@ export default function LandingPage() {
     e.preventDefault();
     setSending(true);
     try {
-      await submitSolicitud({ tipo: 'adquisicion', ...adqForm });
+      await submitSolicitudAndNotify({
+        tipo: 'adquisicion',
+        ...adqForm,
+        organizacion: adqForm.organizacion || adqForm.empresa,
+      }, getNotificationEmail(siteConfig.email));
       setAdqForm({ nombre: '', email: '', dni: '', telefono: '', organizacion: '', rubro: '', empresa: '', producto: '', cadena: '', cantidad: '', presupuesto: '', mensaje: '' });
       toast.success('Solicitud de adquisición enviada. Te contactaremos a la brevedad.');
     } catch (error) {
@@ -784,4 +790,8 @@ export default function LandingPage() {
       </footer>
     </div>
   );
+}
+
+function getNotificationEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : defaultContactEmail;
 }

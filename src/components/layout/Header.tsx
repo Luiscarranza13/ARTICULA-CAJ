@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Bell, Sun, Moon, Search, X, Check } from 'lucide-react';
+import { Bell, Check, Sun, Moon, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store/useStore';
-import { timeAgo, classNames } from '../../lib/utils';
+import { classNames, timeAgo } from '../../lib/utils';
 
 interface Props {
   title: string;
@@ -18,9 +18,17 @@ const notifIcons: Record<string, string> = {
 };
 
 export default function Header({ title, subtitle }: Props) {
-  const { darkMode, toggleDarkMode, notifications, unreadCount, markAsRead, markAllRead, sidebarCollapsed } = useStore();
-  const [showNotif, setShowNotif] = useState(false);
+  const {
+    darkMode,
+    toggleDarkMode,
+    sidebarCollapsed,
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllRead,
+  } = useStore();
   const [showSearch, setShowSearch] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
 
   return (
     <header
