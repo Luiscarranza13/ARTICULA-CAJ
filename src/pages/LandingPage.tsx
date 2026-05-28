@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useLandingGSAP } from '../hooks/useLandingGSAP';
+import MagneticButton from '../components/common/MagneticButton';
+const HeroParticles = lazy(() => import('../components/three/HeroParticles'));
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useScroll } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import {
   ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Globe, Users, ShoppingBag,
@@ -135,6 +138,9 @@ export default function LandingPage() {
   const [convocatorias, setConvocatorias] = useState<PublicConvocatoria[]>([]);
   const [contentTab, setContentTab] = useState<'noticias' | 'eventos' | 'convocatorias'>('noticias');
 
+  // Activar animaciones GSAP ScrollTrigger
+  useLandingGSAP();
+
   const stats = buildLandingStats(landingKpis, siteConfig);
   const activeTestimonios = testimonios.filter((t) => t.activo).sort((a, b) => a.orden - b.orden);
 
@@ -150,7 +156,6 @@ export default function LandingPage() {
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 400], [0, -60]);
 
   useEffect(() => {
     document.title = 'ARTICULA CAJ | Cadenas Productivas de Cajamarca';
@@ -327,54 +332,47 @@ export default function LandingPage() {
 
       {/* HERO */}
       <section id="plataforma" className="relative min-h-screen flex items-center overflow-hidden bg-white">
+        {/* Three.js particles */}
+        <Suspense fallback={null}>
+          <HeroParticles />
+        </Suspense>
+
         {/* Background decorations */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden hero-parallax">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-emerald-50 blur-3xl opacity-70" />
           <div className="absolute top-1/2 -left-20 w-96 h-96 rounded-full bg-emerald-100/40 blur-2xl" />
           <div className="absolute bottom-0 right-1/3 w-72 h-72 rounded-full bg-amber-50/60 blur-3xl" />
           <div className="absolute inset-0 opacity-[0.022] landing-dot-grid" />
         </div>
 
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[Coffee, Leaf, Wheat, ShoppingBag, BarChart3, Droplets].map((Icon, i) => (
-            <motion.div key={i} className="absolute opacity-[0.10] select-none"
-              style={{ left: `${8 + i * 14}%`, top: `${24 + (i % 2) * 36}%` }}
-              animate={{ y: [0, -18, 0], rotate: [0, 6, -6, 0] }}
-              transition={{ duration: 4 + i * 0.5, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}>
-              <Icon className="w-10 h-10 text-emerald-500" />
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.div style={{ y: heroY }} className="relative max-w-7xl mx-auto w-full px-6 py-32 pt-40 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div className="relative max-w-7xl mx-auto w-full px-6 py-32 pt-40 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="min-w-0">
-            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-medium mb-8">
+            <div className="hero-badge inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-medium mb-8">
               <Zap className="w-4 h-4" /> Nueva plataforma para Cajamarca
-            </motion.div>
+            </div>
 
-            <motion.h1 variants={fadeUp} initial="hidden" animate="visible" custom={1}
-              className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-surface-950 leading-[1.08] mb-6">
-              <span className="block">Conectando las</span>
-              <span className="block text-emerald-600">cadenas productivas</span>
-              <span className="block">de Cajamarca</span>
-            </motion.h1>
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-surface-950 leading-[1.08] mb-6">
+              <span className="hero-line block">Conectando las</span>
+              <span className="hero-line block text-emerald-600">cadenas productivas</span>
+              <span className="hero-line block">de Cajamarca</span>
+            </h1>
 
-            <motion.p variants={fadeUp} initial="hidden" animate="visible" custom={2}
-              className="text-surface-500 text-lg leading-relaxed mb-10 max-w-xl">
+            <p className="hero-sub text-surface-500 text-lg leading-relaxed mb-10 max-w-xl">
               Una plataforma inteligente para productores, compradores e instituciones. Articula, conecta y potencia el desarrollo económico de la región.
-            </motion.p>
+            </p>
 
-            <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3} className="flex flex-col sm:flex-row gap-4 mb-12">
-              <a href="#contacto"
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-emerald-600 text-white font-semibold rounded-2xl shadow-emerald hover:bg-emerald-700 hover:-translate-y-0.5 transition-all duration-200">
-                <Mail className="w-5 h-5" /> Solicitar acceso
-              </a>
-              <Link to="/login"
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white border border-surface-200 text-surface-700 font-semibold rounded-2xl shadow-card hover:bg-surface-50 hover:-translate-y-0.5 transition-all duration-200">
-                Iniciar sesión <ArrowRight className="w-5 h-5" />
-              </Link>
-            </motion.div>
+            <div className="flex flex-col sm:flex-row gap-4 mb-12">
+              <MagneticButton>
+                <a href="#contacto" className="hero-cta inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-emerald-600 text-white font-semibold rounded-2xl shadow-emerald hover:bg-emerald-700 transition-all duration-200">
+                  <Mail className="w-5 h-5" /> Solicitar acceso
+                </a>
+              </MagneticButton>
+              <MagneticButton>
+                <Link to="/login" className="hero-cta inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white border border-surface-200 text-surface-700 font-semibold rounded-2xl shadow-card hover:bg-surface-50 transition-all duration-200">
+                  Iniciar sesión <ArrowRight className="w-5 h-5" />
+                </Link>
+              </MagneticButton>
+            </div>
 
             <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={4} className="flex flex-wrap items-center gap-3 text-surface-500 text-sm">
               <div className="flex -space-x-2">
@@ -423,7 +421,7 @@ export default function LandingPage() {
               </div>
             </div>
           </motion.div>
-        </motion.div>
+        </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-emerald-400 animate-bounce">
           <ChevronDown className="w-6 h-6" />
@@ -431,11 +429,10 @@ export default function LandingPage() {
       </section>
 
       {/* STATS BAR */}
-      <section className="bg-white py-12 border-y border-surface-100">
+      <section className="stats-bar bg-white py-12 border-y border-surface-100">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }} className="text-center group">
+            <div key={i} className="stat-item text-center group">
               <div className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${stat.bgColor}`}>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </div>
@@ -443,13 +440,13 @@ export default function LandingPage() {
                 <AnimatedCounter end={stat.value} prefix={stat.prefix} suffix={stat.suffix} decimals={stat.decimals} />
               </p>
               <p className="text-surface-500 text-sm mt-1">{stat.label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
 
       {/* CADENAS PRODUCTIVAS */}
-      <section id="cadenas" className="py-24 bg-white">
+      <section id="cadenas" className="cadenas-section py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Cadenas Productivas</span>
@@ -472,10 +469,9 @@ export default function LandingPage() {
 
           <motion.div key={cadenaIndex} initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45 }}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {visibleCadenas.map((c, i) => (
-              <motion.div key={c.nombre} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }} whileHover={{ y: -4 }}
-                className={`bg-gradient-to-br ${c.color} border rounded-2xl p-6 cursor-default transition-shadow duration-300 hover:shadow-card-hover`}>
+            {visibleCadenas.map((c) => (
+              <motion.div key={c.nombre} whileHover={{ y: -6, scale: 1.02 }} transition={{ type: 'spring', stiffness: 300 }}
+                className={`cadena-card bg-gradient-to-br ${c.color} border rounded-2xl p-6 cursor-default transition-shadow duration-300 hover:shadow-card-hover`}>
                 <div className={`w-12 h-12 ${c.iconBg} rounded-2xl flex items-center justify-center mb-4 shadow-sm`}>
                   <c.icon className="w-6 h-6 text-white" />
                 </div>
@@ -494,7 +490,7 @@ export default function LandingPage() {
       </section>
 
       {/* BENEFICIOS */}
-      <section className="py-24 bg-surface-50 border-y border-surface-100">
+      <section className="benefits-section py-24 bg-surface-50 border-y border-surface-100">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">¿Por qué ARTICULA CAJ?</span>
@@ -504,9 +500,8 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {beneficios.map((b, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }} whileHover={{ y: -4 }}
-                className="bg-white card p-6 hover:shadow-card-hover transition-all duration-300 group cursor-default">
+              <motion.div key={i} whileHover={{ y: -6, scale: 1.02 }} transition={{ type: 'spring', stiffness: 260 }}
+                className="benefit-card bg-white card p-6 hover:shadow-card-hover transition-all duration-300 group cursor-default">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${b.iconClass}`}>
                   <b.icon className="w-6 h-6" />
                 </div>
@@ -519,7 +514,7 @@ export default function LandingPage() {
       </section>
 
       {/* CONTENIDOS PÚBLICOS — Noticias, Eventos, Convocatorias */}
-      <section id="contenidos" className="py-24 bg-surface-50 border-y border-surface-100">
+      <section id="contenidos" className="content-section py-24 bg-surface-50 border-y border-surface-100">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-12">
             <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Actualidad</span>
@@ -535,7 +530,7 @@ export default function LandingPage() {
               { id: 'convocatorias' as const, label: 'Convocatorias',  icon: Bell,      count: convocatorias.length },
             ]).map(({ id, label, icon: Icon, count }) => (
               <button key={id} type="button" onClick={() => setContentTab(id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                className={`content-tab-btn flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
                   contentTab === id
                     ? 'bg-emerald-600 text-white shadow-emerald'
                     : 'bg-white border border-surface-200 text-surface-600 hover:border-emerald-300 hover:text-emerald-700'
@@ -727,8 +722,8 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
             {/* Misión */}
-            <motion.div initial={{ opacity: 0, x: -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-              className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-3xl p-8">
+            <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 260 }}
+              className="mision-card bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-3xl p-8">
               <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-emerald">
                 <Heart className="w-7 h-7 text-white" />
               </div>
@@ -739,8 +734,8 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Visión */}
-            <motion.div initial={{ opacity: 0, x: 24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-              className="bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-3xl p-8">
+            <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 260 }}
+              className="vision-card bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-3xl p-8">
               <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
                 <TrendingUp className="w-7 h-7 text-white" />
               </div>
@@ -752,15 +747,15 @@ export default function LandingPage() {
           </div>
 
           {/* Valores */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="valores-section grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: Shield,        titulo: 'Transparencia',  desc: 'Información verificada y actores validados.' },
               { icon: Users,        titulo: 'Inclusión',       desc: 'Acceso para todos los actores productivos.' },
               { icon: Link2,        titulo: 'Articulación',    desc: 'Conexiones reales que generan valor.' },
               { icon: TrendingUp,   titulo: 'Impacto',         desc: 'Resultados medibles en el territorio.' },
             ].map((v, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                className="text-center p-5 rounded-2xl bg-surface-50 border border-surface-100">
+              <motion.div key={i} whileHover={{ y: -4, scale: 1.04 }} transition={{ type: 'spring', stiffness: 300 }}
+                className="valor-card text-center p-5 rounded-2xl bg-surface-50 border border-surface-100 cursor-default">
                 <div className="w-12 h-12 rounded-xl bg-white border border-surface-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
                   <v.icon className="w-5 h-5 text-emerald-600" />
                 </div>

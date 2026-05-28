@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -7,6 +7,7 @@ import { Activity, Package, TrendingUp, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fetchRealKpis } from '../lib/data';
 import type { PublicLandingKpis } from '../lib/data';
+const GlobeIndicators = lazy(() => import('../components/three/GlobeIndicators'));
 
 type Cadena = { id: string; nombre: string; actores: number; volumen_anual: number; impacto_economico: number };
 
@@ -72,12 +73,28 @@ export default function IndicatorsPage() {
         <div className="card p-10 text-center text-surface-400">Cargando indicadores...</div>
       ) : (
         <>
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Metric icon={Users} label="Productores activos" value={kpis?.productores_activos ?? 0} />
-            <Metric icon={Package} label="Productos publicados" value={kpis?.productos_publicados ?? 0} />
-            <Metric icon={Activity} label="Acuerdos comerciales" value={kpis?.acuerdos_comerciales ?? 0} />
-            <Metric icon={TrendingUp} label="Ventas cerradas" value={kpis?.ventas_cerradas ?? 0} money />
+          {/* Globo 3D + KPIs */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Globo de Cajamarca */}
+            <div className="lg:col-span-2 card overflow-hidden relative min-h-[280px]">
+              <div className="absolute inset-0">
+                <Suspense fallback={null}>
+                  <GlobeIndicators />
+                </Suspense>
+              </div>
+              <div className="relative z-10 p-5 pointer-events-none">
+                <h3 className="font-display font-bold text-surface-900 mb-1">Cajamarca</h3>
+                <p className="text-xs text-surface-500">Red productiva regional</p>
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="lg:col-span-3 grid grid-cols-2 gap-4 content-center">
+              <Metric icon={Users} label="Productores activos" value={kpis?.productores_activos ?? 0} />
+              <Metric icon={Package} label="Productos publicados" value={kpis?.productos_publicados ?? 0} />
+              <Metric icon={Activity} label="Acuerdos comerciales" value={kpis?.acuerdos_comerciales ?? 0} />
+              <Metric icon={TrendingUp} label="Ventas cerradas" value={kpis?.ventas_cerradas ?? 0} money />
+            </div>
           </div>
 
           {/* Gráficos de cadenas */}

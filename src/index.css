@@ -2,6 +2,113 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── GSAP + Three.js visual enhancements ─────────────────────────────────── */
+
+/* Ocultar cursor nativo solo cuando el custom cursor está activo */
+body.custom-cursor-active * {
+  cursor: none !important;
+}
+
+/* Smooth reveal para elementos animados con GSAP */
+.hero-line,
+.hero-sub,
+.hero-badge,
+.hero-cta,
+.stat-item,
+.cadena-card,
+.benefit-card,
+.content-tab-btn,
+.mision-card,
+.vision-card,
+.valor-card,
+.paso-item {
+  will-change: transform, opacity;
+}
+
+/* Canvas de Three.js — siempre detrás del contenido */
+canvas {
+  display: block;
+}
+
+/* Efecto glow en tarjetas al hover */
+.card:hover {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.07),
+    0 2px 4px -2px rgb(0 0 0 / 0.05),
+    0 0 0 1px rgb(16 185 129 / 0.08);
+}
+
+/* Gradiente de texto animado para el hero */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+.text-gradient-animated {
+  background: linear-gradient(270deg, #059669, #10b981, #34d399, #6ee7b7, #059669);
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Partículas del hero — capa decorativa */
+.hero-particles-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Cursor personalizado — base invisible */
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  z-index: 9999;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Glassmorphism mejorado para modales */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 8px 32px rgba(16, 185, 129, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Shimmer de carga — usa transform para no triggear Paint */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+  animation: shimmer 1.5s infinite;
+}
+
+/* Transición de página GSAP — contenido */
+#page-content {
+  will-change: transform, opacity;
+}
+
 @layer base {
   * {
     box-sizing: border-box;

@@ -1,11 +1,11 @@
 import { Outlet, Navigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useStore } from '../../store/useStore';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useLocation } from 'react-router-dom';
 import { classNames } from '../../lib/utils';
 import { canAccessRoute, firstRouteForRole } from '../../lib/permissions';
+import { usePageTransition } from '../../hooks/usePageTransition';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/app/dashboard': { title: 'Dashboard', subtitle: 'Resumen de la plataforma' },
@@ -23,6 +23,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
 export default function AppLayout() {
   const { isAuthenticated, isAuthLoading, sidebarCollapsed, user } = useStore();
   const location = useLocation();
+  usePageTransition();
 
   if (isAuthLoading) {
     return (
@@ -44,15 +45,9 @@ export default function AppLayout() {
       <div className={classNames('transition-all duration-300', sidebarCollapsed ? 'ml-[72px]' : 'ml-64')}>
         <Header title={page.title} subtitle={page.subtitle} />
         <main className="pt-16 min-h-screen">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="p-6"
-          >
+          <div id="page-content" className="p-6">
             <Outlet />
-          </motion.div>
+          </div>
         </main>
       </div>
     </div>
