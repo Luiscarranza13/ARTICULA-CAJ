@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { sendPublicSolicitudConfirmationEmail } from './gmail';
 
@@ -23,19 +22,15 @@ export type SolicitudWeb = {
 
 type SolicitudPayload = Omit<SolicitudWeb, 'id' | 'estado' | 'createdAt'>;
 
-const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY as string | undefined;
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const sendGmailApiKey = import.meta.env.VITE_SEND_GMAIL_API_KEY as string | undefined;
 
-const adminClient = serviceKey && url
-  ? createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-  : null;
-
 export async function submitSolicitud(payload: SolicitudPayload) {
+  const safePayload = normalizeSolicitudPayload(payload);
   const record = {
     tipo: 'oportunidad',
-    titulo: `SOLICITUD:${payload.tipo}:${payload.nombre}`,
-    contenido: JSON.stringify(payload),
+    titulo: `SOLICITUD:${safePayload.tipo}:${safePayload.nombre}`,
+    contenido: JSON.stringify(safePayload),
     estado: 'pendiente',
     fijada: false,
   };
@@ -43,33 +38,67 @@ export async function submitSolicitud(payload: SolicitudPayload) {
   const { error } = await supabase.from('publicaciones').insert(record);
   if (!error) return;
 
-  if (error.code === '42501' && adminClient) {
-    const fallback = await adminClient.from('publicaciones').insert(record);
-    if (!fallback.error) return;
-    throw fallback.error;
-  }
-
   throw error;
 }
 
 export async function submitSolicitudAndNotify(payload: SolicitudPayload, notifyTo: string) {
-  const edgeResult = await submitSolicitudViaEdge(payload, notifyTo);
+  const safePayload = normalizeSolicitudPayload(payload);
+  validateSolicitudPayload(safePayload);
+
+  const edgeResult = await submitSolicitudViaEdge(safePayload, notifyTo);
   if (edgeResult.ok) return;
 
   const [saveResult, confirmationEmailResult] = await Promise.allSettled([
-    submitSolicitud(payload),
+    submitSolicitud(safePayload),
     sendPublicSolicitudConfirmationEmail({
-      ...payload,
+      ...safePayload,
       to: notifyTo,
     }),
   ]);
 
   if (saveResult.status === 'rejected') {
     console.error('No se pudo guardar la solicitud en Supabase', saveResult.reason);
+    throw new Error('No se pudo registrar la solicitud en el sistema. Intenta nuevamente.');
   }
 
   if (confirmationEmailResult.status === 'rejected') {
     throw confirmationEmailResult.reason;
+  }
+}
+
+function normalizeSolicitudPayload(payload: SolicitudPayload): SolicitudPayload {
+  return {
+    ...payload,
+    nombre: payload.nombre.trim(),
+    email: payload.email.trim().toLowerCase(),
+    dni: payload.dni?.trim(),
+    telefono: payload.telefono?.trim(),
+    organizacion: payload.organizacion?.trim(),
+    rubro: payload.rubro?.trim(),
+    empresa: payload.empresa?.trim(),
+    producto: payload.producto?.trim(),
+    cadena: payload.cadena?.trim(),
+    cantidad: payload.cantidad?.trim(),
+    presupuesto: payload.presupuesto?.trim(),
+    mensaje: payload.mensaje.trim(),
+  };
+}
+
+function validateSolicitudPayload(payload: SolicitudPayload) {
+  if (!payload.nombre || payload.nombre.length < 3) {
+    throw new Error('Ingresa tu nombre completo.');
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+    throw new Error('Ingresa un correo electronico valido.');
+  }
+
+  if (!payload.mensaje || payload.mensaje.length < 10) {
+    throw new Error('Escribe un mensaje con mas detalle.');
+  }
+
+  if (payload.tipo === 'adquisicion' && (!payload.cadena || !payload.cantidad)) {
+    throw new Error('Completa la cadena productiva y la cantidad requerida.');
   }
 }
 
@@ -101,8 +130,7 @@ async function submitSolicitudViaEdge(payload: SolicitudPayload, notifyTo: strin
 }
 
 export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {
-  const client = adminClient ?? supabase;
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from('publicaciones')
     .select('id,titulo,contenido,estado,created_at')
     .like('titulo', 'SOLICITUD:%')
@@ -133,14 +161,12 @@ export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {
 }
 
 export async function updateSolicitudEstado(id: string, estado: string) {
-  const client = adminClient ?? supabase;
-  const { error } = await client.from('publicaciones').update({ estado }).eq('id', id);
+  const { error } = await supabase.from('publicaciones').update({ estado }).eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteSolicitud(id: string) {
-  const client = adminClient ?? supabase;
-  const { error } = await client.from('publicaciones').delete().eq('id', id);
+  const { error } = await supabase.from('publicaciones').delete().eq('id', id);
   if (error) throw error;
 }
 

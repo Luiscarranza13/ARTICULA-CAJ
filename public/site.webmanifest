@@ -1,0 +1,17 @@
+{
+  "name": "ARTICULA CAJ",
+  "short_name": "ARTICULA CAJ",
+  "description": "Plataforma de articulacion de cadenas productivas de Cajamarca.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

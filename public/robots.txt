@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://articulacaj.novatec.ink/sitemap.xml
