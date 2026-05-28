@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import LuisPage from './pages/LuisPage'
+const PublicDetailPage = lazy(() => import('./pages/PublicDetailPage'))
 import { useStore } from './store/useStore'
 import { getCurrentProfile, supabase } from './lib/supabase'
 
@@ -26,6 +27,7 @@ export default function App() {
   const login = useStore((state) => state.login);
   const logout = useStore((state) => state.logout);
   const setAuthLoading = useStore((state) => state.setAuthLoading);
+  const loadSiteContent = useStore((state) => state.loadSiteContent);
 
   useEffect(() => {
     let mounted = true;
@@ -64,8 +66,13 @@ export default function App() {
     };
   }, [login, logout, setAuthLoading]);
 
+  useEffect(() => {
+    void loadSiteContent();
+  }, [loadSiteContent]);
+
   return (
     <BrowserRouter>
+      <a href="#main-content" className="skip-link">Saltar al contenido</a>
       <ThemeManager />
       <LuisModeManager />
       <Toaster position="top-right" />
@@ -75,6 +82,7 @@ export default function App() {
         {/* Rutas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/productos" element={<PublicMarketplacePage />} />
+        <Route path="/contenido/:tipo/:id" element={<PublicDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/luis" element={<LuisPage />} />

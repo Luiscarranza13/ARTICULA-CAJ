@@ -140,12 +140,14 @@ export default function DirectoryPage() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="font-display text-xl font-bold text-surface-900">{filtered.length} actores encontrados</h2>
-          <p className="text-surface-400 text-sm">Datos en tiempo real desde la tabla actores</p>
+          <p className="text-surface-400 text-sm">Directorio de productores, asociaciones e instituciones</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={openCreate} className="btn-primary"><Plus className="w-4 h-4" />Nuevo actor</button>
-          <button aria-label="Vista grilla" onClick={() => setViewMode('grid')} className={classNames('w-9 h-9 rounded-xl flex items-center justify-center', viewMode === 'grid' ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-surface-200 text-surface-500')}><Grid className="w-4 h-4" /></button>
-          <button aria-label="Vista lista" onClick={() => setViewMode('list')} className={classNames('w-9 h-9 rounded-xl flex items-center justify-center', viewMode === 'list' ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-surface-200 text-surface-500')}><List className="w-4 h-4" /></button>
+          {user?.rol === 'administrador' && (
+            <button type="button" onClick={openCreate} className="btn-primary"><Plus className="w-4 h-4" />Nuevo actor</button>
+          )}
+          <button type="button" aria-label="Vista grilla" onClick={() => setViewMode('grid')} className={classNames('w-9 h-9 rounded-xl flex items-center justify-center', viewMode === 'grid' ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-surface-200 text-surface-500')}><Grid className="w-4 h-4" /></button>
+          <button type="button" aria-label="Vista lista" onClick={() => setViewMode('list')} className={classNames('w-9 h-9 rounded-xl flex items-center justify-center', viewMode === 'list' ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-surface-200 text-surface-500')}><List className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -156,7 +158,7 @@ export default function DirectoryPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {tipos.map((tipo) => (
-            <button key={tipo} onClick={() => setSelectedTipo(tipo)} className={classNames('px-3 py-1.5 rounded-lg text-xs font-medium', selectedTipo === tipo ? 'bg-emerald-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200')}>
+            <button type="button" key={tipo} onClick={() => setSelectedTipo(tipo)} className={classNames('px-3 py-1.5 rounded-lg text-xs font-medium', selectedTipo === tipo ? 'bg-emerald-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200')}>
               {tipo}
             </button>
           ))}
@@ -198,17 +200,19 @@ export default function DirectoryPage() {
                     <h3 className="font-display text-xl font-bold text-surface-900">{selected.nombre}</h3>
                     <p className="text-sm text-surface-400">{selected.rubro} · {selected.distrito}</p>
                   </div>
-                  <button aria-label="Cerrar" onClick={() => setSelected(null)}><X className="w-5 h-5" /></button>
+                  <button type="button" aria-label="Cerrar" onClick={() => setSelected(null)}><X className="w-5 h-5" /></button>
                 </div>
                 <p className="text-sm text-surface-600 mb-4">{selected.descripcion}</p>
                 <div className="space-y-2 text-sm mb-5">
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" />{selected.contacto.telefono || 'Sin telefono'}</p>
+                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-600" />{selected.contacto.telefono || 'Sin teléfono'}</p>
                   <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-emerald-600" />{selected.contacto.correo || 'Sin correo'}</p>
                 </div>
-                <div className="flex gap-3">
-                  <button className="btn-secondary flex-1 justify-center" onClick={() => openEdit(selected)}><Edit className="w-4 h-4" />Editar</button>
-                  <button className="inline-flex flex-1 justify-center items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl" onClick={() => deleteActor(selected)}><Trash2 className="w-4 h-4" />Eliminar</button>
-                </div>
+                {user?.rol === 'administrador' && (
+                  <div className="flex gap-3">
+                    <button type="button" className="btn-secondary flex-1 justify-center" onClick={() => openEdit(selected)}><Edit className="w-4 h-4" />Editar</button>
+                    <button type="button" className="inline-flex flex-1 justify-center items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl" onClick={() => deleteActor(selected)}><Trash2 className="w-4 h-4" />Eliminar</button>
+                  </div>
+                )}
               </>
             ) : (
               <ActorFormView form={form} setForm={setForm} editing={editing} onCancel={() => { setForm(emptyForm); setEditing(null); setShowForm(false); }} onSave={saveActor} />
@@ -233,21 +237,21 @@ function ActorFormView({ form, setForm, editing, onCancel, onSave }: {
       <h3 className="font-display text-lg font-bold text-surface-900">{editing ? 'Editar actor' : 'Nuevo actor'}</h3>
       <input className="input-field" placeholder="Nombre" value={form.nombre} onChange={(e) => set('nombre', e.target.value)} />
       <div className="grid grid-cols-2 gap-3">
-        <select className="input-field" value={form.tipo} onChange={(e) => set('tipo', e.target.value)}>
+        <select aria-label="Tipo de actor" className="input-field" value={form.tipo} onChange={(e) => set('tipo', e.target.value)}>
           {tipos.filter((tipo) => tipo !== 'Todos').map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
         </select>
         <input className="input-field" placeholder="Rubro" value={form.rubro} onChange={(e) => set('rubro', e.target.value)} />
       </div>
       <input className="input-field" placeholder="Distrito" value={form.distrito} onChange={(e) => set('distrito', e.target.value)} />
-      <textarea className="input-field resize-none" rows={3} placeholder="Descripcion" value={form.descripcion} onChange={(e) => set('descripcion', e.target.value)} />
+      <textarea className="input-field resize-none" rows={3} placeholder="Descripción" value={form.descripcion} onChange={(e) => set('descripcion', e.target.value)} />
       <div className="grid grid-cols-2 gap-3">
         <input className="input-field" placeholder="Telefono" value={form.telefono} onChange={(e) => set('telefono', e.target.value)} />
         <input className="input-field" placeholder="Correo" value={form.correo} onChange={(e) => set('correo', e.target.value)} />
       </div>
       <input className="input-field" placeholder="Capacidad productiva" value={form.capacidadProductiva} onChange={(e) => set('capacidadProductiva', e.target.value)} />
       <div className="flex gap-3 justify-end">
-        <button className="btn-secondary" onClick={onCancel}>Cancelar</button>
-        <button className="btn-primary" onClick={onSave}><Save className="w-4 h-4" />Guardar</button>
+        <button type="button" className="btn-secondary" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="btn-primary" onClick={onSave}><Save className="w-4 h-4" />Guardar</button>
       </div>
     </div>
   );

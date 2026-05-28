@@ -8,11 +8,14 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Faltan VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY en .env');
 }
 
+// Each browser tab gets its own session so two different accounts
+// can be open simultaneously without interfering with each other.
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
   },
 });
 

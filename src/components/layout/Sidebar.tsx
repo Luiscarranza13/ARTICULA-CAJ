@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ShoppingBag, BarChart3,
-  Newspaper, Settings, LogOut, ChevronLeft, ChevronRight, Leaf,
+  Newspaper, Settings, LogOut, ChevronLeft, ChevronRight,
   Inbox, HelpCircle, Link2, UserCog
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -55,9 +55,7 @@ export default function Sidebar() {
               transition={{ duration: 0.2 }}
               className="flex items-center gap-2.5"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-emerald">
-                <Leaf className="w-4 h-4 text-white" />
-              </div>
+              <img src="/logo.jpeg" alt="ARTICULA CAJ" className="w-8 h-8 rounded-xl object-cover shadow-sm" />
               <div>
                 <p className="text-sm font-bold text-surface-900 font-display leading-none">ARTICULA</p>
                 <p className="text-xs font-semibold text-emerald-600 leading-none mt-0.5">CAJ</p>
@@ -66,12 +64,11 @@ export default function Sidebar() {
           )}
         </AnimatePresence>
         {sidebarCollapsed && (
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-emerald mx-auto">
-            <Leaf className="w-4 h-4 text-white" />
-          </div>
+          <img src="/logo.jpeg" alt="ARTICULA CAJ" className="w-8 h-8 rounded-xl object-cover shadow-sm mx-auto" />
         )}
         {!sidebarCollapsed && (
           <button
+            type="button"
             onClick={toggleSidebarCollapsed}
             aria-label="Contraer barra lateral"
             className="w-7 h-7 rounded-lg bg-surface-100 hover:bg-surface-200 flex items-center justify-center transition-colors text-surface-500 hover:text-surface-700"
@@ -85,6 +82,7 @@ export default function Sidebar() {
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {sidebarCollapsed && (
           <button
+            type="button"
             onClick={toggleSidebarCollapsed}
             aria-label="Expandir barra lateral"
             className="w-full flex justify-center p-2 mb-2 text-surface-400 hover:text-surface-600 hover:bg-surface-100 rounded-xl transition-colors"

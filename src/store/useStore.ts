@@ -2,16 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Notificacion, Testimonio, SiteConfig } from '../types';
 import { mockNotificaciones, mockTestimonios } from '../data/mockData';
-
-const DEFAULT_SITE_CONFIG: SiteConfig = {
-  actoresCount: 3847,
-  productosCount: 1234,
-  acuerdosCount: 289,
-  ventasImpacto: 124,
-  telefono: '+51 076 365 000',
-  email: 'info@articulacaj.pe',
-  direccion: 'Cajamarca, Perú',
-};
+import {
+  DEFAULT_SITE_CONFIG,
+  createTestimonioRemote,
+  deleteTestimonioRemote,
+  fetchSiteContent,
+  updateSiteConfigRemote,
+  updateTestimonioRemote,
+} from '../lib/siteContent';
 
 interface AuthSlice {
   user: User | null;
@@ -42,14 +40,16 @@ interface NotifSlice {
 
 interface TestimoniosSlice {
   testimonios: Testimonio[];
-  addTestimonio: (t: Omit<Testimonio, 'id' | 'createdAt'>) => void;
-  updateTestimonio: (id: string, data: Partial<Testimonio>) => void;
-  deleteTestimonio: (id: string) => void;
+  contentLoading: boolean;
+  loadSiteContent: () => Promise<void>;
+  addTestimonio: (t: Omit<Testimonio, 'id' | 'createdAt'>) => Promise<void>;
+  updateTestimonio: (id: string, data: Partial<Testimonio>) => Promise<void>;
+  deleteTestimonio: (id: string) => Promise<void>;
 }
 
 interface SiteConfigSlice {
   siteConfig: SiteConfig;
-  updateSiteConfig: (data: Partial<SiteConfig>) => void;
+  updateSiteConfig: (data: Partial<SiteConfig>) => Promise<void>;
 }
 
 interface LuisModeSlice {
@@ -61,8 +61,7 @@ type Store = AuthSlice & UISlice & NotifSlice & TestimoniosSlice & SiteConfigSli
 
 export const useStore = create<Store>()(
   persist(
-    (set) => ({
-      // Auth
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
       isAuthLoading: false,
@@ -71,21 +70,18 @@ export const useStore = create<Store>()(
       setAuthLoading: (loading) => set({ isAuthLoading: loading }),
       updateUser: (data) => set((s) => ({ user: s.user ? { ...s.user, ...data } : null })),
 
-      // UI
       darkMode: false,
       sidebarOpen: true,
       sidebarCollapsed: false,
       toggleDarkMode: () => set((s) => {
         const next = !s.darkMode;
-        if (next) document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
+        document.documentElement.classList.toggle('dark', next);
         return { darkMode: next };
       }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       toggleSidebarCollapsed: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-      // Notifications
       notifications: mockNotificaciones,
       unreadCount: mockNotificaciones.filter((n) => !n.leida).length,
       markAsRead: (id) =>
@@ -99,41 +95,51 @@ export const useStore = create<Store>()(
           unreadCount: 0,
         })),
 
-      // Testimonios
       testimonios: mockTestimonios,
-      addTestimonio: (t) =>
-        set((s) => ({
-          testimonios: [
-            ...s.testimonios,
-            { ...t, id: `t-${Date.now()}`, createdAt: new Date().toISOString() },
-          ],
-        })),
-      updateTestimonio: (id, data) =>
+      contentLoading: false,
+      loadSiteContent: async () => {
+        set({ contentLoading: true });
+        try {
+          const content = await fetchSiteContent(mockTestimonios);
+          set({ testimonios: content.testimonios, siteConfig: content.siteConfig });
+        } finally {
+          set({ contentLoading: false });
+        }
+      },
+      addTestimonio: async (t) => {
+        const created = await createTestimonioRemote(t);
+        set((s) => ({ testimonios: [...s.testimonios, created] }));
+      },
+      updateTestimonio: async (id, data) => {
+        await updateTestimonioRemote(id, data);
         set((s) => ({
           testimonios: s.testimonios.map((t) => t.id === id ? { ...t, ...data } : t),
-        })),
-      deleteTestimonio: (id) =>
-        set((s) => ({ testimonios: s.testimonios.filter((t) => t.id !== id) })),
+        }));
+      },
+      deleteTestimonio: async (id) => {
+        await deleteTestimonioRemote(id);
+        set((s) => ({ testimonios: s.testimonios.filter((t) => t.id !== id) }));
+      },
 
-      // Site Config
       siteConfig: DEFAULT_SITE_CONFIG,
-      updateSiteConfig: (data) =>
-        set((s) => ({ siteConfig: { ...s.siteConfig, ...data } })),
+      updateSiteConfig: async (data) => {
+        const next = { ...get().siteConfig, ...data };
+        await updateSiteConfigRemote(next);
+        set({ siteConfig: next });
+      },
 
-      // Luis Mode
       luisMode: false,
       toggleLuisMode: () => set((s) => ({ luisMode: !s.luisMode })),
     }),
     {
-      name: 'articula-caj-v2',
+      name: 'articula-caj-v3',
       partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
+        // Auth state is derived from Supabase sessionStorage — not persisted here
         darkMode: state.darkMode,
         sidebarCollapsed: state.sidebarCollapsed,
-        testimonios: state.testimonios,
-        siteConfig: state.siteConfig,
         luisMode: state.luisMode,
+        // Persist notification read state so "mark all read" survives a reload
+        notifications: state.notifications,
       }),
     }
   )

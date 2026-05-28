@@ -49,9 +49,37 @@ export default function AdminContactPage() {
 
   // Config form state (controlled so edits are live)
   const [configForm, setConfigForm] = useState<SiteConfig>(siteConfig);
-  const saveConfig = () => {
-    updateSiteConfig(configForm);
-    toast.success('Configuración guardada');
+  const [liveKpis, setLiveKpis] = useState<{ actores: number; productos: number } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        // Intenta la vista primero; si falla, cuenta directamente
+        const { data } = await supabase.from('v_dashboard_kpis').select('productores_activos,productos_publicados').maybeSingle();
+        if (data?.productores_activos != null) {
+          setLiveKpis({ actores: Number(data.productores_activos), productos: Number(data.productos_publicados ?? 0) });
+          return;
+        }
+      } catch { /* vista no existe */ }
+      const [a, p] = await Promise.all([
+        supabase.from('perfiles').select('id', { count: 'exact', head: true }).eq('estado', 'aprobado'),
+        supabase.from('productos').select('id', { count: 'exact', head: true }).eq('publicado', true),
+      ]);
+      setLiveKpis({ actores: a.count ?? 0, productos: p.count ?? 0 });
+    })();
+  }, []);
+
+  const saveConfig = async () => {
+    try {
+      // Sync live counts into config before saving
+      const toSave = liveKpis
+        ? { ...configForm, actoresCount: liveKpis.actores, productosCount: liveKpis.productos }
+        : configForm;
+      await updateSiteConfig(toSave);
+      toast.success('Configuración guardada');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la configuracion');
+    }
   };
 
   // Solicitudes state
@@ -88,6 +116,10 @@ export default function AdminContactPage() {
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [load]);
+
+  useEffect(() => {
+    queueMicrotask(() => setConfigForm(siteConfig));
+  }, [siteConfig]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -173,19 +205,40 @@ export default function AdminContactPage() {
     setTestimonioModal({ open: true, item: t });
   };
 
-  const saveTestimonio = () => {
+  const lookupUserPhoto = async (nombre: string) => {
+    if (!nombre.trim()) return;
+    const { data } = await supabase
+      .from('perfiles')
+      .select('avatar_url')
+      .ilike('nombre', `%${nombre.split(' ')[0]}%`)
+      .not('avatar_url', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    if (data?.avatar_url) {
+      setTestimonioForm((f) => ({ ...f, foto: data.avatar_url as string }));
+      toast.success('Foto obtenida del perfil');
+    } else {
+      toast('No se encontró foto de perfil para ese nombre', { icon: 'ℹ️' });
+    }
+  };
+
+  const saveTestimonio = async () => {
     if (!testimonioForm.nombre || !testimonioForm.cargo || !testimonioForm.texto) {
       toast.error('Nombre, cargo y texto son obligatorios');
       return;
     }
-    if (testimonioModal.item) {
-      updateTestimonio(testimonioModal.item.id, testimonioForm);
-      toast.success('Testimonio actualizado');
-    } else {
-      addTestimonio(testimonioForm);
-      toast.success('Testimonio creado');
+    try {
+      if (testimonioModal.item) {
+        await updateTestimonio(testimonioModal.item.id, testimonioForm);
+        toast.success('Testimonio actualizado');
+      } else {
+        await addTestimonio(testimonioForm);
+        toast.success('Testimonio creado');
+      }
+      setTestimonioModal({ open: false, item: null });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el testimonio');
     }
-    setTestimonioModal({ open: false, item: null });
   };
 
   const stats = {
@@ -356,7 +409,9 @@ export default function AdminContactPage() {
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button type="button"
-                      onClick={() => updateTestimonio(t.id, { activo: !t.activo })}
+                      onClick={() => void updateTestimonio(t.id, { activo: !t.activo }).catch((error) => {
+                        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar');
+                      })}
                       className={classNames('w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
                         t.activo ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-surface-100 text-surface-400 hover:bg-surface-200')}
                       aria-label={t.activo ? 'Ocultar testimonio' : 'Mostrar testimonio'}>
@@ -428,18 +483,16 @@ export default function AdminContactPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <ConfigStatField
+              {/* Actores y Productos son auto-calculados desde la BD */}
+              <AutoStatField
                 label="Actores registrados"
                 icon={Users}
-                suffix="+"
-                value={configForm.actoresCount}
-                onChange={(v) => setConfigForm((f) => ({ ...f, actoresCount: v }))}
+                value={liveKpis?.actores ?? configForm.actoresCount}
               />
-              <ConfigStatField
+              <AutoStatField
                 label="Productos en vitrina"
                 icon={Package}
-                value={configForm.productosCount}
-                onChange={(v) => setConfigForm((f) => ({ ...f, productosCount: v }))}
+                value={liveKpis?.productos ?? configForm.productosCount}
               />
               <ConfigStatField
                 label="Acuerdos comerciales"
@@ -589,8 +642,23 @@ export default function AdminContactPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="label">Nombre *</label>
-                      <input type="text" className="input-field" placeholder="Nombre completo" value={testimonioForm.nombre}
-                        onChange={(e) => setTestimonioForm((f) => ({ ...f, nombre: e.target.value }))} />
+                      <div className="flex gap-2">
+                        <input type="text" className="input-field flex-1" placeholder="Nombre completo" value={testimonioForm.nombre}
+                          onChange={(e) => setTestimonioForm((f) => ({ ...f, nombre: e.target.value }))} />
+                        <button type="button" title="Buscar foto del perfil por nombre"
+                          onClick={() => void lookupUserPhoto(testimonioForm.nombre)}
+                          className="btn-secondary px-3 py-2 text-xs whitespace-nowrap">
+                          Buscar foto
+                        </button>
+                      </div>
+                      {testimonioForm.foto && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <img src={testimonioForm.foto} alt="Vista previa" className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-100" />
+                          <span className="text-xs text-emerald-600">Foto encontrada</span>
+                          <button type="button" onClick={() => setTestimonioForm((f) => ({ ...f, foto: '' }))}
+                            className="text-xs text-surface-400 hover:text-red-500">Quitar</button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="label">Cargo *</label>
@@ -603,24 +671,9 @@ export default function AdminContactPage() {
                         onChange={(e) => setTestimonioForm((f) => ({ ...f, organizacion: e.target.value }))} />
                     </div>
                     <div className="col-span-2">
-                      <label className="label">URL de foto</label>
-                      <input type="url" className="input-field" placeholder="https://..." value={testimonioForm.foto}
-                        onChange={(e) => setTestimonioForm((f) => ({ ...f, foto: e.target.value }))} />
-                    </div>
-                    <div className="col-span-2">
                       <label className="label">Testimonio *</label>
                       <textarea rows={4} className="input-field resize-none" placeholder="El texto del testimonio..."
                         value={testimonioForm.texto} onChange={(e) => setTestimonioForm((f) => ({ ...f, texto: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className="label">Rating (1–5)</label>
-                      <div className="flex gap-1 mt-1">
-                        {[1, 2, 3, 4, 5].map((r) => (
-                          <button key={r} type="button" aria-label={`${r} estrella${r > 1 ? 's' : ''}`} onClick={() => setTestimonioForm((f) => ({ ...f, rating: r }))}>
-                            <Star className={classNames('w-7 h-7 transition-colors', r <= testimonioForm.rating ? 'text-amber-400 fill-amber-400' : 'text-surface-200 hover:text-amber-300')} />
-                          </button>
-                        ))}
-                      </div>
                     </div>
                     <div>
                       <label htmlFor="t-orden" className="label">Orden</label>
@@ -671,7 +724,18 @@ export default function AdminContactPage() {
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center py-2 text-sm">Cancelar</button>
                   <button type="button"
-                    onClick={() => { deleteTestimonio(deleteConfirm); setDeleteConfirm(null); toast.success('Testimonio eliminado'); }}
+                    onClick={() => {
+                      const id = deleteConfirm;
+                      if (!id) return;
+                      void deleteTestimonio(id)
+                        .then(() => {
+                          setDeleteConfirm(null);
+                          toast.success('Testimonio eliminado');
+                        })
+                        .catch((error) => {
+                          toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
+                        });
+                    }}
                     className="flex-1 py-2 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors">
                     Eliminar
                   </button>
@@ -855,6 +919,22 @@ function EstadoSelect({ value, onChange }: { value: string; onChange: (v: string
       <option value="aprobado">Aprobado</option>
       <option value="rechazado">Rechazado</option>
     </select>
+  );
+}
+
+function AutoStatField({ label, value, icon: Icon }: {
+  label: string; value: number; icon: typeof Mail;
+}) {
+  return (
+    <div>
+      <label className="label flex items-center gap-1.5">
+        <Icon className="w-3.5 h-3.5 text-emerald-600" /> {label}
+      </label>
+      <div className="input-field bg-surface-50 text-surface-700 font-semibold flex items-center justify-between">
+        <span>{value.toLocaleString('es-PE')}</span>
+        <span className="text-xs text-emerald-600 font-normal">Auto · BD</span>
+      </div>
+    </div>
   );
 }
 

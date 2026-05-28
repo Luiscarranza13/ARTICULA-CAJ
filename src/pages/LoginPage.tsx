@@ -172,7 +172,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-xs text-surface-400 mt-5 leading-relaxed">
-            El acceso es solo para usuarios aprobados por administracion. Las credenciales se entregan por correo.
+            El acceso es solo para usuarios aprobados por administración. Las credenciales se entregan por correo.
           </p>
         </motion.div>
       </div>

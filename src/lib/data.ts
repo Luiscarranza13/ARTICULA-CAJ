@@ -70,6 +70,7 @@ export type PublicLandingKpis = {
   productos_publicados?: number | null;
   acuerdos_comerciales?: number | null;
   ventas_cerradas?: number | null;
+  cadenas_activas?: number | null;
 };
 
 export type PublicLandingCadena = {
@@ -84,40 +85,87 @@ export type PublicLandingCadena = {
 
 const fallbackImage = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80';
 
+// Cuenta registros reales directamente de las tablas base.
+// Es el fallback cuando la vista v_dashboard_kpis no existe.
+// También exportada para IndicatorsPage y AdminContactPage.
+export async function fetchRealKpis(): Promise<PublicLandingKpis> {
+  const [perfilesRes, productosRes, configRes] = await Promise.all([
+    // Total de perfiles aprobados (productores activos)
+    supabase.from('perfiles').select('id', { count: 'exact', head: true }).eq('estado', 'aprobado'),
+    // Productos publicados en vitrina
+    supabase.from('productos').select('id', { count: 'exact', head: true }).eq('publicado', true),
+    // Acuerdos y ventas son editables manualmente desde Configuración
+    supabase.from('site_config').select('acuerdos_count,ventas_impacto').eq('id', 'main').maybeSingle(),
+  ]);
+
+  const cfg = configRes.data as { acuerdos_count?: number | null; ventas_impacto?: number | null } | null;
+
+  return {
+    productores_activos: perfilesRes.count ?? 0,
+    productos_publicados: productosRes.count ?? 0,
+    acuerdos_comerciales: Number(cfg?.acuerdos_count ?? 0),
+    // ventas_impacto en site_config está en millones (ej. 124 → S/ 124,000,000)
+    ventas_cerradas: Number(cfg?.ventas_impacto ?? 0) * 1_000_000,
+    cadenas_activas: null,
+  };
+}
+
+// Intenta obtener KPIs desde la vista materializada; si falla, usa conteo directo
+async function fetchKpis(): Promise<PublicLandingKpis> {
+  try {
+    const { data, error } = await supabase.from('v_dashboard_kpis').select('*').maybeSingle();
+    if (!error && data && (data as Record<string, unknown>).productores_activos != null) {
+      return data as PublicLandingKpis;
+    }
+  } catch {
+    // vista no existe — caemos al conteo directo
+  }
+  return fetchRealKpis();
+}
+
 export async function fetchDashboardData() {
-  const [kpis, cadenas, publicaciones, eventos] = await Promise.all([
-    supabase.from('v_dashboard_kpis').select('*').maybeSingle(),
+  const [kpis, cadenasRes, publicaciones, eventos] = await Promise.all([
+    fetchKpis(),
     supabase.from('v_cadenas_resumen').select('*').limit(6),
     fetchPublicaciones(5),
     fetchEventos(3),
   ]);
 
-  if (kpis.error) throw kpis.error;
-  if (cadenas.error) throw cadenas.error;
-  return {
-    kpis: kpis.data,
-    cadenas: cadenas.data ?? [],
-    publicaciones,
-    eventos,
-  };
+  // Si la vista de cadenas también falla, usamos la tabla directa
+  let cadenas = cadenasRes.data ?? [];
+  if (cadenasRes.error || cadenas.length === 0) {
+    const { data } = await supabase
+      .from('cadenas_productivas')
+      .select('id,nombre,categoria,actores:actores,volumen_anual:volumen_anual,impacto_economico:impacto_economico')
+      .eq('estado', 'activo')
+      .limit(6);
+    cadenas = data ?? [];
+  }
+
+  return { kpis, cadenas, publicaciones, eventos };
 }
 
 export async function fetchPublicLandingData() {
-  const [kpis, cadenas] = await Promise.all([
-    supabase.from('v_dashboard_kpis').select('*').maybeSingle(),
+  const [kpis, cadenasRes] = await Promise.all([
+    fetchKpis(),
     supabase
       .from('v_cadenas_resumen')
       .select('id,nombre,categoria,estado,actores,volumen_anual,impacto_economico')
       .order('actores', { ascending: false }),
   ]);
 
-  if (kpis.error) throw kpis.error;
-  if (cadenas.error) throw cadenas.error;
+  // Fallback si la vista de cadenas no existe
+  let cadenas = (cadenasRes.data ?? []) as PublicLandingCadena[];
+  if (cadenasRes.error || cadenas.length === 0) {
+    const { data } = await supabase
+      .from('cadenas_productivas')
+      .select('id,nombre,categoria,actores,volumen_anual,impacto_economico')
+      .eq('estado', 'activo')
+      .order('actores', { ascending: false });
+    cadenas = (data ?? []) as PublicLandingCadena[];
+  }
 
-  return {
-    kpis: (kpis.data ?? {}) as PublicLandingKpis,
-    cadenas: (cadenas.data ?? []) as PublicLandingCadena[],
-  };
+  return { kpis, cadenas };
 }
 
 export async function fetchActores(): Promise<Actor[]> {
@@ -229,6 +277,97 @@ export async function fetchEventos(limit = 20): Promise<Evento[]> {
     gratuito: true,
     tags: event.categoria ? [event.categoria] : [],
   }));
+}
+
+// ─── Contenidos públicos para la landing ─────────────────────────────────────
+
+export type PublicNoticia = {
+  id: string;
+  titulo: string;
+  contenido: string;
+  imagen_url: string | null;
+  createdAt: string;
+  autorNombre: string;
+  autorAvatar: string | null;
+};
+
+export type PublicEvento = {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  lugar: string;
+  tipo: string;
+  imagen_url: string | null;
+  organizador: string;
+};
+
+export type PublicConvocatoria = {
+  id: string;
+  titulo: string;
+  contenido: string;
+  imagen_url: string | null;
+  createdAt: string;
+  autorNombre: string;
+};
+
+export async function fetchPublicContent() {
+  const [noticiasRes, convocatoriasRes, eventosRes, perfilesRes] = await Promise.all([
+    supabase
+      .from('publicaciones')
+      .select('id,titulo,contenido,imagen_url,created_at,autor_id')
+      .eq('tipo', 'publicacion')
+      .eq('estado', 'aprobado')
+      .not('titulo', 'ilike', 'SOLICITUD:%')
+      .order('created_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('publicaciones')
+      .select('id,titulo,contenido,imagen_url,created_at,autor_id')
+      .eq('tipo', 'convocatoria')
+      .eq('estado', 'aprobado')
+      .order('created_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('eventos')
+      .select('id,titulo,descripcion,fecha,lugar,tipo,imagen_url,organizador_texto')
+      .order('fecha', { ascending: true })
+      .limit(6),
+    supabase.from('perfiles').select('id,nombre,apellido,avatar_url'),
+  ]);
+
+  const profileMap = new Map(
+    ((perfilesRes.data ?? []) as { id: string; nombre: string | null; apellido: string | null; avatar_url: string | null }[])
+      .map((p) => [p.id, { nombre: `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim() || 'ARTICULA CAJ', avatar: p.avatar_url }])
+  );
+
+  const toNoticia = (row: { id: string; titulo: string | null; contenido: string | null; imagen_url: string | null; created_at: string | null; autor_id: string | null }): PublicNoticia => {
+    const author = row.autor_id ? profileMap.get(row.autor_id) : undefined;
+    return {
+      id: row.id,
+      titulo: row.titulo ?? '',
+      contenido: row.contenido ?? '',
+      imagen_url: row.imagen_url,
+      createdAt: row.created_at ?? new Date().toISOString(),
+      autorNombre: author?.nombre ?? 'ARTICULA CAJ',
+      autorAvatar: author?.avatar ?? null,
+    };
+  };
+
+  return {
+    noticias: ((noticiasRes.data ?? []) as Parameters<typeof toNoticia>[0][]).map(toNoticia),
+    convocatorias: ((convocatoriasRes.data ?? []) as Parameters<typeof toNoticia>[0][]).map(toNoticia),
+    eventos: ((eventosRes.data ?? []) as { id: string; titulo: string | null; descripcion: string | null; fecha: string | null; lugar: string | null; tipo: string | null; imagen_url: string | null; organizador_texto: string | null }[]).map((e) => ({
+      id: e.id,
+      titulo: e.titulo ?? '',
+      descripcion: e.descripcion ?? '',
+      fecha: e.fecha ?? '',
+      lugar: e.lugar ?? '',
+      tipo: e.tipo ?? 'feria',
+      imagen_url: e.imagen_url,
+      organizador: e.organizador_texto ?? 'ARTICULA CAJ',
+    } as PublicEvento)),
+  };
 }
 
 export async function firstCategoriaId() {

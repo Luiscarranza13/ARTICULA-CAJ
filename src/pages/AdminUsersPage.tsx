@@ -111,7 +111,7 @@ export default function AdminUsersPage() {
 
   const sendCredentials = async (user: AdminUser, password: string) => {
     if (!password) {
-      toast.error('No hay contrasena para enviar.');
+      toast.error('No hay contraseña para enviar.');
       return;
     }
 
@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-bold text-surface-900">Usuarios</h2>
-          <p className="text-surface-400 text-sm">Administracion de cuentas, roles y perfiles de acceso.</p>
+          <p className="text-surface-400 text-sm">Administración de cuentas, roles y perfiles de acceso.</p>
         </div>
         <button type="button" onClick={openCreate} className="btn-primary">
           <Plus className="w-4 h-4" /> Nuevo usuario
@@ -175,7 +175,7 @@ export default function AdminUsersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-100 bg-surface-50">
-                  {['Usuario', 'Rol', 'Organizacion', 'Estado', 'Registro', 'Acciones'].map((head) => (
+                  {['Usuario', 'Rol', 'Organización', 'Estado', 'Registro', 'Acciones'].map((head) => (
                     <th key={head} className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase tracking-wide whitespace-nowrap">{head}</th>
                   ))}
                 </tr>
@@ -191,7 +191,7 @@ export default function AdminUsersPage() {
                       <span className={classNames('badge', getRolColor(user.rol))}>{getRolLabel(user.rol)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-surface-700 text-xs">{user.organizacion || 'Sin organizacion'}</p>
+                      <p className="text-surface-700 text-xs">{user.organizacion || 'Sin organización'}</p>
                       <p className="text-surface-400 text-xs">{user.rubro || user.ubicacion}</p>
                     </td>
                     <td className="px-4 py-3">
@@ -270,7 +270,7 @@ function UserModal({ user, saving, onClose, onSave }: {
       return;
     }
     if (!user && (!form.password || form.password.length < 8)) {
-      toast.error('La contrasena debe tener al menos 8 caracteres');
+      toast.error('La contraseña debe tener al menos 8 caracteres');
       return;
     }
     onSave(form, user);
@@ -284,7 +284,7 @@ function UserModal({ user, saving, onClose, onSave }: {
           <div className="flex items-center justify-between p-5 border-b border-surface-100">
             <div>
               <h3 className="font-display text-lg font-bold text-surface-900">{user ? 'Editar usuario' : 'Nuevo usuario'}</h3>
-              <p className="text-xs text-surface-400">{user ? 'Actualiza perfil, rol o contrasena.' : 'Crea acceso y envia credenciales por correo.'}</p>
+              <p className="text-xs text-surface-400">{user ? 'Actualiza perfil, rol o contraseña.' : 'Crea acceso y envía credenciales por correo.'}</p>
             </div>
             <button type="button" aria-label="Cerrar" onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-400">
               <X className="w-4 h-4" />
@@ -303,8 +303,8 @@ function UserModal({ user, saving, onClose, onSave }: {
                 {roles.map((item) => <option key={item} value={item}>{getRolLabel(item)}</option>)}
               </select>
             </div>
-            <Field label="Organizacion" value={form.organizacion} onChange={(value) => set('organizacion', value)} />
-            <Field label="Ubicacion" value={form.ubicacion} onChange={(value) => set('ubicacion', value)} />
+            <Field label="Organización" value={form.organizacion} onChange={(value) => set('organizacion', value)} />
+            <Field label="Ubicación" value={form.ubicacion} onChange={(value) => set('ubicacion', value)} />
             <Field label="Rubro" value={form.rubro} onChange={(value) => set('rubro', value)} />
             <div>
               <label htmlFor="user-estado" className="label">Estado</label>
@@ -315,15 +315,15 @@ function UserModal({ user, saving, onClose, onSave }: {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label htmlFor="user-password" className="label">{user ? 'Nueva contrasena opcional' : 'Contrasena *'}</label>
+              <label htmlFor="user-password" className="label">{user ? 'Nueva contraseña (opcional)' : 'Contraseña *'}</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input id="user-password" type={showPassword ? 'text' : 'password'} className="input-field pr-10" value={form.password} onChange={(event) => set('password', event.target.value)} autoComplete="new-password" />
-                  <button type="button" aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'} onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600">
+                  <button type="button" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <button type="button" onClick={generate} className="btn-secondary px-3" title="Generar contrasena">
+                <button type="button" onClick={generate} className="btn-secondary px-3" title="Generar contraseña">
                   <Copy className="w-4 h-4" />
                 </button>
               </div>

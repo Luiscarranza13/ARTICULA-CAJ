@@ -8,11 +8,16 @@ import {
   MessageSquare, Shield, Zap, Menu, X, Phone, Mail,
   Coffee, Droplets, Bean, Wheat, Sprout, Hexagon,
   Landmark, Truck, Cog, Heart, Package, Network, Quote,
+  Newspaper, Calendar, Bell, Clock,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import AnimatedCounter from '../components/common/AnimatedCounter';
 import toast from 'react-hot-toast';
-import { fetchPublicLandingData, type PublicLandingCadena, type PublicLandingKpis } from '../lib/data';
+import {
+  fetchPublicLandingData, fetchPublicContent,
+  type PublicLandingCadena, type PublicLandingKpis,
+  type PublicNoticia, type PublicEvento, type PublicConvocatoria,
+} from '../lib/data';
 import { submitSolicitudAndNotify } from '../lib/solicitudes';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
@@ -124,6 +129,12 @@ export default function LandingPage() {
   const [landingKpis, setLandingKpis] = useState<PublicLandingKpis | null>(null);
   const [landingCadenas, setLandingCadenas] = useState<LandingCadenaCard[]>(cadenas);
 
+  // ── Contenidos públicos ──────────────────────────────────────────────────────
+  const [noticias, setNoticias] = useState<PublicNoticia[]>([]);
+  const [eventos, setEventos] = useState<PublicEvento[]>([]);
+  const [convocatorias, setConvocatorias] = useState<PublicConvocatoria[]>([]);
+  const [contentTab, setContentTab] = useState<'noticias' | 'eventos' | 'convocatorias'>('noticias');
+
   const stats = buildLandingStats(landingKpis, siteConfig);
   const activeTestimonios = testimonios.filter((t) => t.activo).sort((a, b) => a.orden - b.orden);
 
@@ -140,6 +151,10 @@ export default function LandingPage() {
 
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 400], [0, -60]);
+
+  useEffect(() => {
+    document.title = 'ARTICULA CAJ | Cadenas Productivas de Cajamarca';
+  }, []);
 
   useEffect(() => {
     const unsub = scrollY.on('change', (v) => setScrolled(v > 20));
@@ -186,12 +201,33 @@ export default function LandingPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'actores' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'publicaciones' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cadenas_productivas' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_config' }, () => void load())
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
+  }, []);
+
+  // Carga de contenidos públicos con realtime
+  useEffect(() => {
+    const loadContent = async () => {
+      try {
+        const data = await fetchPublicContent();
+        setNoticias(data.noticias);
+        setEventos(data.eventos);
+        setConvocatorias(data.convocatorias);
+      } catch (error) {
+        console.error('No se pudieron cargar contenidos públicos', error);
+      }
+    };
+    queueMicrotask(() => void loadContent());
+    const ch = supabase
+      .channel('landing-content-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'publicaciones' }, () => void loadContent())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'eventos' }, () => void loadContent())
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
   }, []);
 
   const visibleCadenas = Array.from({ length: Math.min(3, landingCadenas.length) }, (_, i) => landingCadenas[(cadenaIndex + i) % landingCadenas.length]);
@@ -231,15 +267,13 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white font-sans">
+    <div id="main-content" className="min-h-screen overflow-x-hidden bg-white font-sans">
 
       {/* NAVBAR */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 shadow-glass border-b border-surface-100' : 'bg-white/90 backdrop-blur-sm border-b border-transparent'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-emerald">
-              <Leaf className="w-4 h-4 text-white" />
-            </div>
+            <img src="/logo.jpeg" alt="ARTICULA CAJ" className="w-8 h-8 rounded-xl object-cover shadow-sm" />
             <div>
               <span className="font-display font-bold text-surface-900">ARTICULA</span>
               <span className="font-display font-bold ml-1 text-emerald-600">CAJ</span>
@@ -250,8 +284,9 @@ export default function LandingPage() {
             {[
               { label: 'Plataforma', href: '#plataforma' },
               { label: 'Cadenas', href: '#cadenas' },
+              { label: 'Contenidos', href: '#contenidos' },
               { label: 'Productos', href: '/productos' },
-              { label: 'Cómo funciona', href: '#como-funciona' },
+              { label: 'Nosotros', href: '#nosotros' },
               { label: 'Testimonios', href: '#testimonios' },
             ].map(({ label, href }) => (
               <a key={label} href={href} className="text-sm font-medium text-surface-600 hover:text-emerald-700 transition-colors">
@@ -278,7 +313,7 @@ export default function LandingPage() {
         {menuOpen && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             className="md:hidden bg-white border-t border-surface-100 px-6 py-4 space-y-1">
-            {[{ label: 'Plataforma', href: '#plataforma' }, { label: 'Cadenas', href: '#cadenas' }, { label: 'Productos', href: '/productos' }, { label: 'Cómo funciona', href: '#como-funciona' }, { label: 'Testimonios', href: '#testimonios' }].map(({ label, href }) => (
+            {[{ label: 'Plataforma', href: '#plataforma' }, { label: 'Cadenas', href: '#cadenas' }, { label: 'Contenidos', href: '#contenidos' }, { label: 'Productos', href: '/productos' }, { label: 'Nosotros', href: '#nosotros' }, { label: 'Testimonios', href: '#testimonios' }].map(({ label, href }) => (
               <a key={label} href={href} onClick={() => setMenuOpen(false)}
                 className="block text-sm font-medium text-surface-600 py-2.5 hover:text-emerald-700">{label}</a>
             ))}
@@ -483,6 +518,169 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* CONTENIDOS PÚBLICOS — Noticias, Eventos, Convocatorias */}
+      <section id="contenidos" className="py-24 bg-surface-50 border-y border-surface-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-12">
+            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Actualidad</span>
+            <h2 className="section-title mb-4">Noticias, Eventos y Convocatorias</h2>
+            <p className="section-subtitle max-w-2xl mx-auto">Información actualizada en tiempo real desde el panel administrativo de ARTICULA CAJ.</p>
+          </motion.div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 justify-center mb-10">
+            {([
+              { id: 'noticias' as const,      label: 'Noticias',       icon: Newspaper, count: noticias.length },
+              { id: 'eventos' as const,       label: 'Eventos',        icon: Calendar,  count: eventos.length },
+              { id: 'convocatorias' as const, label: 'Convocatorias',  icon: Bell,      count: convocatorias.length },
+            ]).map(({ id, label, icon: Icon, count }) => (
+              <button key={id} type="button" onClick={() => setContentTab(id)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  contentTab === id
+                    ? 'bg-emerald-600 text-white shadow-emerald'
+                    : 'bg-white border border-surface-200 text-surface-600 hover:border-emerald-300 hover:text-emerald-700'
+                }`}>
+                <Icon className="w-4 h-4" />
+                {label}
+                {count > 0 && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${contentTab === id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Noticias */}
+          {contentTab === 'noticias' && (
+            <AnimatePresence mode="wait">
+              <motion.div key="noticias" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.35 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {noticias.length === 0 ? (
+                  <div className="md:col-span-2 lg:col-span-3 text-center text-surface-400 py-16">
+                    <Newspaper className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No hay noticias publicadas aún.</p>
+                  </div>
+                ) : noticias.map((noticia, i) => (
+                  <motion.div key={noticia.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                    <Link to={`/contenido/noticia/${noticia.id}`}
+                      className="block bg-white rounded-2xl border border-surface-200 overflow-hidden hover:shadow-card-hover hover:-translate-y-1 transition-all group">
+                      <ContentCardImage url={noticia.imagen_url} alt={noticia.titulo} tipo="noticia" />
+                      <div className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AvatarSmall avatar={noticia.autorAvatar} nombre={noticia.autorNombre} />
+                          <span className="text-xs text-surface-500 truncate">{noticia.autorNombre}</span>
+                          <span className="text-surface-300 text-xs flex-shrink-0">·</span>
+                          <span className="text-xs text-surface-400 flex-shrink-0">{new Date(noticia.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                        {noticia.titulo && <h3 className="font-display font-bold text-surface-900 mb-2 line-clamp-2 group-hover:text-emerald-700 transition-colors">{noticia.titulo}</h3>}
+                        {noticia.contenido !== '📷' && (
+                          <p className="text-sm text-surface-500 line-clamp-3 leading-relaxed">{noticia.contenido}</p>
+                        )}
+                        <span className="inline-block mt-3 text-xs text-emerald-600 font-semibold group-hover:underline">Leer más →</span>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          )}
+
+          {/* Eventos */}
+          {contentTab === 'eventos' && (
+            <AnimatePresence mode="wait">
+              <motion.div key="eventos" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.35 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {eventos.length === 0 ? (
+                  <div className="md:col-span-2 lg:col-span-3 text-center text-surface-400 py-16">
+                    <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No hay eventos próximos.</p>
+                  </div>
+                ) : eventos.map((evento, i) => (
+                  <motion.div key={evento.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                    <Link to={`/contenido/evento/${evento.id}`}
+                      className="block bg-white rounded-2xl border border-surface-200 overflow-hidden hover:shadow-card-hover hover:-translate-y-1 transition-all group">
+                      <ContentCardImage url={evento.imagen_url} alt={evento.titulo} tipo="evento" />
+                      <div className="p-5">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold capitalize">
+                            <Calendar className="w-3 h-3" />{evento.tipo}
+                          </span>
+                          {evento.fecha && (
+                            <span className="inline-flex items-center gap-1 text-xs text-surface-500">
+                              <Clock className="w-3 h-3" />
+                              {new Date(evento.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-display font-bold text-surface-900 mb-2 line-clamp-2 group-hover:text-emerald-700 transition-colors">{evento.titulo}</h3>
+                        <p className="text-sm text-surface-500 line-clamp-2 leading-relaxed mb-3">{evento.descripcion}</p>
+                        {evento.lugar && (
+                          <p className="text-xs text-surface-400 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 flex-shrink-0 text-emerald-500" />{evento.lugar}
+                          </p>
+                        )}
+                        <span className="inline-block mt-3 text-xs text-emerald-600 font-semibold group-hover:underline">Ver detalle →</span>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          )}
+
+          {/* Convocatorias */}
+          {contentTab === 'convocatorias' && (
+            <AnimatePresence mode="wait">
+              <motion.div key="convocatorias" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.35 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {convocatorias.length === 0 ? (
+                  <div className="md:col-span-2 text-center text-surface-400 py-16">
+                    <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No hay convocatorias activas.</p>
+                  </div>
+                ) : convocatorias.map((conv, i) => (
+                  <motion.div key={conv.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                    <Link to={`/contenido/convocatoria/${conv.id}`}
+                      className="flex gap-5 bg-white rounded-2xl border border-surface-200 p-6 hover:shadow-card-hover hover:-translate-y-0.5 transition-all group">
+                      <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-amber-50 flex items-center justify-center">
+                        {conv.imagen_url
+                          ? <ContentCardImageInline url={conv.imagen_url} alt={conv.titulo} />
+                          : <Bell className="w-10 h-10 text-amber-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold">
+                            <Bell className="w-3 h-3" />Convocatoria
+                          </span>
+                          <span className="text-xs text-surface-400 flex-shrink-0">
+                            {new Date(conv.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}
+                          </span>
+                        </div>
+                        <h3 className="font-display font-bold text-surface-900 mb-1 line-clamp-2 group-hover:text-emerald-700 transition-colors">{conv.titulo}</h3>
+                        <p className="text-sm text-surface-500 line-clamp-2 leading-relaxed">{conv.contenido}</p>
+                        <span className="inline-block mt-2 text-xs text-emerald-600 font-semibold group-hover:underline">Ver detalle →</span>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          )}
+
+          {/* CTA */}
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="mt-12 text-center">
+            <Link to="/login" className="btn-primary px-8 py-3">
+              Ver todo en la plataforma <ArrowRight className="w-4 h-4" />
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
       {/* CÓMO FUNCIONA */}
       <section id="como-funciona" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
@@ -513,6 +711,64 @@ export default function LandingPage() {
               Solicitar acceso <ArrowRight className="w-5 h-5" />
             </a>
           </motion.div>
+        </div>
+      </section>
+
+      {/* NOSOTROS — VISIÓN Y MISIÓN */}
+      <section id="nosotros" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
+            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold mb-4">Nosotros</span>
+            <h2 className="section-title mb-4">¿Quiénes somos?</h2>
+            <p className="section-subtitle max-w-3xl mx-auto">
+              ARTICULA CAJ es una plataforma digital impulsada por el Gobierno Regional de Cajamarca para conectar a todos los actores de las cadenas productivas de la región: productores, compradores e instituciones.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            {/* Misión */}
+            <motion.div initial={{ opacity: 0, x: -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+              className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-3xl p-8">
+              <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-emerald">
+                <Heart className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="font-display text-2xl font-bold text-surface-900 mb-4">Nuestra Misión</h3>
+              <p className="text-surface-600 leading-relaxed">
+                Articular a los actores productivos de Cajamarca en un ecosistema digital que facilite el acceso a información, mercados y oportunidades, promoviendo el desarrollo económico sostenible e inclusivo de la región.
+              </p>
+            </motion.div>
+
+            {/* Visión */}
+            <motion.div initial={{ opacity: 0, x: 24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+              className="bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-3xl p-8">
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                <TrendingUp className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="font-display text-2xl font-bold text-surface-900 mb-4">Nuestra Visión</h3>
+              <p className="text-surface-600 leading-relaxed">
+                Ser la plataforma de referencia para el desarrollo de las cadenas productivas del norte del Perú, reconocida por su impacto real en la mejora de ingresos de los productores y la dinamización del comercio regional.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Valores */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: Shield,        titulo: 'Transparencia',  desc: 'Información verificada y actores validados.' },
+              { icon: Users,        titulo: 'Inclusión',       desc: 'Acceso para todos los actores productivos.' },
+              { icon: Link2,        titulo: 'Articulación',    desc: 'Conexiones reales que generan valor.' },
+              { icon: TrendingUp,   titulo: 'Impacto',         desc: 'Resultados medibles en el territorio.' },
+            ].map((v, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
+                className="text-center p-5 rounded-2xl bg-surface-50 border border-surface-100">
+                <div className="w-12 h-12 rounded-xl bg-white border border-surface-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                  <v.icon className="w-5 h-5 text-emerald-600" />
+                </div>
+                <h4 className="font-display font-bold text-surface-900 text-sm mb-1">{v.titulo}</h4>
+                <p className="text-xs text-surface-500 leading-relaxed">{v.desc}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -855,9 +1111,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             <div>
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
-                  <Leaf className="w-4 h-4 text-white" />
-                </div>
+                <img src="/logo.jpeg" alt="ARTICULA CAJ" className="w-8 h-8 rounded-xl object-cover shadow-sm" />
                 <div>
                   <span className="font-display font-bold text-surface-900">ARTICULA</span>
                   <span className="font-display font-bold text-emerald-500 ml-1">CAJ</span>
@@ -900,25 +1154,73 @@ export default function LandingPage() {
   );
 }
 
+// ── Helpers de imagen con fallback automático ────────────────────────────────
+
+function ContentCardImage({ url, alt, tipo }: { url: string | null; alt: string; tipo: 'noticia' | 'evento' | 'convocatoria' }) {
+  const [failed, setFailed] = useState(false);
+  const placeholders: Record<string, { bg: string; Icon: typeof Newspaper }> = {
+    noticia:      { bg: 'from-emerald-50 to-emerald-100', Icon: Newspaper },
+    evento:       { bg: 'from-blue-50 to-indigo-100',     Icon: Calendar },
+    convocatoria: { bg: 'from-amber-50 to-amber-100',     Icon: Bell },
+  };
+  const { bg, Icon } = placeholders[tipo];
+
+  if (!url || failed) {
+    return (
+      <div className={`h-44 bg-gradient-to-br ${bg} flex items-center justify-center`}>
+        <Icon className="w-12 h-12 opacity-30" />
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden h-44">
+      <img src={url} alt={alt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        onError={() => setFailed(true)} />
+    </div>
+  );
+}
+
+function ContentCardImageInline({ url, alt }: { url: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <Bell className="w-10 h-10 text-amber-400" />;
+  return <img src={url} alt={alt} className="w-full h-full object-cover" onError={() => setFailed(true)} />;
+}
+
+function AvatarSmall({ avatar, nombre }: { avatar: string | null; nombre: string }) {
+  const [failed, setFailed] = useState(false);
+  if (avatar && !failed) {
+    return <img src={avatar} alt={nombre} className="w-7 h-7 rounded-full object-cover flex-shrink-0" onError={() => setFailed(true)} />;
+  }
+  return (
+    <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+      {nombre.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 function getNotificationEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : defaultContactEmail;
 }
 
 function buildLandingStats(kpis: PublicLandingKpis | null, fallback: SiteConfig): LandingStat[] {
-  const fallbackSales = fallback.ventasImpacto * 1_000_000;
-  const sales = Number(kpis?.ventas_cerradas ?? fallbackSales);
-  const salesInMillions = sales >= 1_000_000;
+  // Si kpis ya cargaron usamos esos valores; solo usamos fallback de siteConfig
+  // para acuerdos y ventas si el kpis real no los trae.
+  const productores = Number(kpis?.productores_activos ?? 0);
+  const productos   = Number(kpis?.productos_publicados ?? 0);
+  const acuerdos    = Number(kpis?.acuerdos_comerciales ?? fallback.acuerdosCount);
+  const salesRaw    = Number(kpis?.ventas_cerradas ?? (fallback.ventasImpacto * 1_000_000));
+  const salesInM    = salesRaw >= 1_000_000;
 
   return [
-    { label: 'Productores Activos', value: Number(kpis?.productores_activos ?? fallback.actoresCount), color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: Users },
-    { label: 'Productos Publicados', value: Number(kpis?.productos_publicados ?? fallback.productosCount), color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Package },
-    { label: 'Acuerdos Comerciales', value: Number(kpis?.acuerdos_comerciales ?? fallback.acuerdosCount), color: 'text-purple-600', bgColor: 'bg-purple-50', icon: Network },
+    { label: 'Productores Activos',  value: productores, color: 'text-emerald-600', bgColor: 'bg-emerald-50',  icon: Users },
+    { label: 'Productos Publicados', value: productos,   color: 'text-blue-600',    bgColor: 'bg-blue-50',    icon: Package },
+    { label: 'Acuerdos Comerciales', value: acuerdos,    color: 'text-purple-600',  bgColor: 'bg-purple-50',  icon: Network },
     {
       label: 'Ventas Cerradas',
-      value: salesInMillions ? sales / 1_000_000 : sales,
+      value: salesInM ? salesRaw / 1_000_000 : salesRaw,
       prefix: 'S/ ',
-      suffix: salesInMillions ? 'M' : '',
-      decimals: salesInMillions && sales % 1_000_000 !== 0 ? 1 : 0,
+      suffix: salesInM ? 'M' : '',
+      decimals: salesInM && salesRaw % 1_000_000 !== 0 ? 1 : 0,
       color: 'text-amber-600',
       bgColor: 'bg-amber-50',
       icon: TrendingUp,

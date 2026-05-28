@@ -8,36 +8,41 @@ interface Props {
   decimals?: number;
 }
 
-export default function AnimatedCounter({ end, duration = 2000, prefix = '', suffix = '', decimals = 0 }: Props) {
+export default function AnimatedCounter({ end, duration = 1800, prefix = '', suffix = '', decimals = 0 }: Props) {
   const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const startedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !startedRef.current) {
-          startedRef.current = true;
-          const startTime = performance.now();
-          const animate = (currentTime: number) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 4);
-            setCount(eased * end);
-            if (progress < 1) requestAnimationFrame(animate);
-          };
-          requestAnimationFrame(animate);
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+    // Cancelar animación anterior si end cambia antes de terminar
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+
+    if (end === 0) {
+      setCount(0);
+      return;
+    }
+
+    const startTime = performance.now();
+    const from = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setCount(from + eased * (end - from));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setCount(end);
+        rafRef.current = null;
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
   }, [end, duration]);
 
-  return (
-    <span ref={ref}>
-      {prefix}{count.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}{suffix}
-    </span>
-  );
+  const formatted = count.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return <span>{prefix}{formatted}{suffix}</span>;
 }

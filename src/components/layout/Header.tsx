@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, Check, Sun, Moon, Search, X } from 'lucide-react';
+import { Bell, Check, Sun, Moon, Search, X, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store/useStore';
 import { classNames, timeAgo } from '../../lib/utils';
@@ -43,7 +44,19 @@ export default function Header({ title, subtitle }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Search */}
+          {/* Ver página principal */}
+          <Link
+            to="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ver página principal"
+            aria-label="Ver página principal"
+            className="w-9 h-9 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-500 hover:text-emerald-700 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </Link>
+
+          {/* Búsqueda */}
           <AnimatePresence>
             {showSearch && (
               <motion.div
@@ -64,6 +77,7 @@ export default function Header({ title, subtitle }: Props) {
           </AnimatePresence>
 
           <button
+            type="button"
             onClick={() => setShowSearch((s) => !s)}
             aria-label={showSearch ? 'Cerrar búsqueda' : 'Abrir búsqueda'}
             className="w-9 h-9 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-500 hover:text-surface-700 transition-colors"
@@ -71,8 +85,9 @@ export default function Header({ title, subtitle }: Props) {
             {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
           </button>
 
-          {/* Dark mode */}
+          {/* Modo oscuro */}
           <button
+            type="button"
             onClick={toggleDarkMode}
             aria-label={darkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
             className="w-9 h-9 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-500 hover:text-surface-700 transition-colors"
@@ -80,9 +95,10 @@ export default function Header({ title, subtitle }: Props) {
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {/* Notifications */}
+          {/* Notificaciones */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setShowNotif((s) => !s)}
               aria-label={showNotif ? 'Cerrar notificaciones' : 'Abrir notificaciones'}
               className="w-9 h-9 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-500 hover:text-surface-700 transition-colors relative"
@@ -109,14 +125,22 @@ export default function Header({ title, subtitle }: Props) {
                     <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
                       <h3 className="font-semibold text-surface-800 text-sm">Notificaciones</h3>
                       {unreadCount > 0 && (
-                        <button onClick={markAllRead} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={markAllRead}
+                          className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+                        >
                           <Check className="w-3 h-3" /> Marcar todas
                         </button>
                       )}
                     </div>
                     <div className="max-h-80 overflow-y-auto scrollbar-thin divide-y divide-surface-50">
+                      {notifications.length === 0 && (
+                        <p className="text-center text-surface-400 text-sm py-6">Sin notificaciones</p>
+                      )}
                       {notifications.map((n) => (
                         <button
+                          type="button"
                           key={n.id}
                           onClick={() => markAsRead(n.id)}
                           className={classNames('w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-surface-50 transition-colors', !n.leida && 'bg-emerald-50/30')}
