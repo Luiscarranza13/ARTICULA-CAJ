@@ -1,13 +1,16 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, Edit, Heart, MapPin, MessageSquare, Package, Plus, Save, Search, Star, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Badge from '../components/common/Badge';
 import { fetchProductos, firstCategoriaId } from '../lib/data';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { classNames, formatCurrency, getDisponibilidadColor } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import type { Actor, Producto } from '../types';
+
+const db = supabaseAdmin ?? supabase;
 
 type ProductForm = {
   nombre: string;
@@ -137,14 +140,14 @@ export default function MarketplacePage() {
       publicado: true,
     };
     const result = editing
-      ? await supabase.from('productos').update(payload).eq('id', editing.id).select('id').single()
-      : await supabase.from('productos').insert(payload).select('id').single();
+      ? await db.from('productos').update(payload).eq('id', editing.id).select('id').single()
+      : await db.from('productos').insert(payload).select('id').single();
 
     if (result.error) { toast.error(result.error.message); return; }
 
     if (form.imagen.trim()) {
-      await supabase.from('producto_imagenes').delete().eq('producto_id', result.data.id);
-      await supabase.from('producto_imagenes').insert({ producto_id: result.data.id, url: form.imagen.trim(), orden: 1, alt: form.nombre });
+      await db.from('producto_imagenes').delete().eq('producto_id', result.data.id);
+      await db.from('producto_imagenes').insert({ producto_id: result.data.id, url: form.imagen.trim(), orden: 1, alt: form.nombre });
     }
     toast.success(editing ? 'Producto actualizado' : 'Producto publicado');
     setShowForm(false);
@@ -154,8 +157,8 @@ export default function MarketplacePage() {
   };
 
   const deleteProduct = async (product: Producto) => {
-    await supabase.from('producto_imagenes').delete().eq('producto_id', product.id);
-    const { error } = await supabase.from('productos').delete().eq('id', product.id);
+    await db.from('producto_imagenes').delete().eq('producto_id', product.id);
+    const { error } = await db.from('productos').delete().eq('id', product.id);
     if (error) toast.error(error.message);
     else { toast.success('Producto eliminado'); setSelected(null); await load(); }
   };
@@ -242,9 +245,9 @@ export default function MarketplacePage() {
       )}
 
       {/* Modal detalle */}
-      {selected && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      {selected && createPortal(
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-lg overflow-hidden max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <img src={selected.imagenes[0]} alt={selected.nombre} className="w-full h-56 object-cover" />
             <div className="p-6 space-y-4">
               <div className="flex justify-between gap-4">
@@ -275,17 +278,19 @@ export default function MarketplacePage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Modal formulario */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+      {showForm && createPortal(
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowForm(false)}>
           <ProductFormView form={form} setForm={setForm}
             actors={isProductor ? actores.filter((a) => myActorIds.includes(a.id)) : actores}
             categories={categoryRows} editing={editing}
             onCancel={() => setShowForm(false)} onSave={saveProduct} isAdmin={isAdmin} />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -341,7 +346,7 @@ function ProductFormView({ form, setForm, actors, categories, editing, onCancel,
 }) {
   const set = (field: keyof ProductForm, value: string) => setForm((c) => ({ ...c, [field]: value }));
   return (
-    <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-xl p-6 space-y-4 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
       <h3 className="font-display text-lg font-bold text-surface-900">{editing ? 'Editar producto' : 'Publicar producto'}</h3>
       <div>
         <label htmlFor="prod-nombre" className="label">Nombre *</label>

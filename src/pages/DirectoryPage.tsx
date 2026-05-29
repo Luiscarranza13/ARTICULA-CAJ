@@ -1,12 +1,15 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, Edit, Grid, List, Mail, MapPin, Phone, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { fetchActores } from '../lib/data';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { classNames, getTipoActorColor } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import type { Actor } from '../types';
+
+const db = supabaseAdmin ?? supabase;
 
 type ActorForm = {
   nombre: string;
@@ -111,8 +114,8 @@ export default function DirectoryPage() {
     };
 
     const result = editing
-      ? await supabase.from('actores').update(payload).eq('id', editing.id)
-      : await supabase.from('actores').insert(payload);
+      ? await db.from('actores').update(payload).eq('id', editing.id)
+      : await db.from('actores').insert(payload);
 
     if (result.error) {
       toast.error(result.error.message);
@@ -126,7 +129,7 @@ export default function DirectoryPage() {
   };
 
   const deleteActor = async (actor: Actor) => {
-    const { error } = await supabase.from('actores').delete().eq('id', actor.id);
+    const { error } = await db.from('actores').delete().eq('id', actor.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Actor eliminado');
@@ -190,9 +193,9 @@ export default function DirectoryPage() {
         </div>
       )}
 
-      {(selected || showForm) && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { setSelected(null); setEditing(null); setForm(emptyForm); setShowForm(false); }}>
-          <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+      {(selected || showForm) && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => { setSelected(null); setEditing(null); setForm(emptyForm); setShowForm(false); }}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-lg p-6 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {selected && !showForm ? (
               <>
                 <div className="flex justify-between gap-4 mb-4">
@@ -218,7 +221,8 @@ export default function DirectoryPage() {
               <ActorFormView form={form} setForm={setForm} editing={editing} onCancel={() => { setForm(emptyForm); setEditing(null); setShowForm(false); }} onSave={saveActor} />
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
