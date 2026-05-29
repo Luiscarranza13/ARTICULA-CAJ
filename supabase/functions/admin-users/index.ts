@@ -23,7 +23,7 @@ type AdminUserInput = {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return json({ ok: true }, 200);
-  if (request.method !== 'POST') return json({ error: 'Metodo no permitido' }, 405);
+  if (request.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
 
   try {
     await assertAdmin(request);
@@ -40,7 +40,7 @@ Deno.serve(async (request) => {
       return json({ ok: true });
     }
 
-    throw httpError(400, 'Accion invalida');
+    throw httpError(400, 'Acción inválida');
   } catch (error) {
     const status = error instanceof AppError ? error.status : 500;
     const message = error instanceof Error ? error.message : 'Operacion de usuarios fallida';
@@ -59,9 +59,9 @@ async function assertAdmin(request: Request) {
     },
   });
 
-  if (!userResponse.ok) throw httpError(401, 'Sesion invalida');
+  if (!userResponse.ok) throw httpError(401, 'Sesión inválida');
   const user = await userResponse.json() as { id?: string };
-  if (!user.id) throw httpError(401, 'Sesion invalida');
+  if (!user.id) throw httpError(401, 'Sesión inválida');
 
   const profileResponse = await supabaseFetch(`/rest/v1/perfiles?auth_user_id=eq.${encodeURIComponent(user.id)}&select=rol&limit=1`);
   const profiles = await profileResponse.json() as { rol?: string }[];
@@ -76,7 +76,7 @@ async function listUsers() {
 
 async function createUser(input: AdminUserInput) {
   const email = input.correo.trim().toLowerCase();
-  if (!input.password || input.password.length < 8) throw httpError(400, 'La contrasena debe tener al menos 8 caracteres.');
+  if (!input.password || input.password.length < 8) throw httpError(400, 'La contraseña debe tener al menos 8 caracteres.');
 
   const authResponse = await supabaseFetch('/auth/v1/admin/users', {
     method: 'POST',

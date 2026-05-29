@@ -1,47 +1,41 @@
 import { useEffect, useRef } from 'react';
-import gsap from 'gsap';
 
-// Cursor personalizado con seguimiento suave — solo visible en desktop
 export default function CustomCursor() {
   const dotRef  = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Solo en dispositivos con puntero fino (desktop)
     if (window.matchMedia('(pointer: coarse)').matches) return;
 
     const dot  = dotRef.current;
     const ring = ringRef.current;
     if (!dot || !ring) return;
 
-    // Ocultar cursor nativo
     document.body.style.cursor = 'none';
 
+    let mx = 0, my = 0;
+    let rx = 0, ry = 0;
+    let rafId = 0;
+
     const onMove = (e: MouseEvent) => {
-      // Punto: instantáneo
-      gsap.set(dot, { x: e.clientX, y: e.clientY });
-      // Anillo: suavizado con lag
-      gsap.to(ring, { x: e.clientX, y: e.clientY, duration: 0.18, ease: 'power2.out' });
+      mx = e.clientX;
+      my = e.clientY;
+      dot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
     };
 
-    const onEnterLink = () => {
-      gsap.to(ring, { scale: 2.2, opacity: 0.4, duration: 0.25, ease: 'power2.out' });
-      gsap.to(dot,  { scale: 0.4, duration: 0.25 });
+    const tick = () => {
+      rx += (mx - rx) * 0.18;
+      ry += (my - ry) * 0.18;
+      ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+      rafId = requestAnimationFrame(tick);
     };
+    rafId = requestAnimationFrame(tick);
 
-    const onLeaveLink = () => {
-      gsap.to(ring, { scale: 1, opacity: 0.7, duration: 0.3, ease: 'power2.out' });
-      gsap.to(dot,  { scale: 1, duration: 0.3 });
-    };
+    const onEnterLink = () => { ring.style.scale = '2.2'; ring.style.opacity = '0.4'; dot.style.scale = '0.4'; };
+    const onLeaveLink = () => { ring.style.scale = '1';   ring.style.opacity = '0.7'; dot.style.scale = '1'; };
+    const onDown = () => { ring.style.scale = '0.8'; };
+    const onUp   = () => { ring.style.scale = '1'; };
 
-    const onDown = () => gsap.to(ring, { scale: 0.8, duration: 0.1 });
-    const onUp   = () => gsap.to(ring, { scale: 1,   duration: 0.2, ease: 'back.out(2)' });
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('mouseup',   onUp);
-
-    // Ampliar en hover de links y botones
     const addHover = () => {
       document.querySelectorAll('a, button, [role="button"], input, textarea, select').forEach((el) => {
         el.addEventListener('mouseenter', onEnterLink);
@@ -50,12 +44,16 @@ export default function CustomCursor() {
     };
     addHover();
 
-    // Re-aplicar en cambios del DOM
     const observer = new MutationObserver(addHover);
     observer.observe(document.body, { childList: true, subtree: true });
 
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup',   onUp);
+
     return () => {
       document.body.style.cursor = '';
+      cancelAnimationFrame(rafId);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('mouseup',   onUp);
@@ -65,16 +63,12 @@ export default function CustomCursor() {
 
   return (
     <>
-      {/* Punto central */}
-      <div
-        ref={dotRef}
-        className="fixed top-0 left-0 z-[9999] w-2 h-2 bg-emerald-500 rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 mix-blend-difference"
+      <div ref={dotRef}
+        className="fixed top-0 left-0 z-[9999] w-2 h-2 bg-emerald-500 rounded-full pointer-events-none mix-blend-difference [transition:scale_0.25s]"
         aria-hidden="true"
       />
-      {/* Anillo exterior */}
-      <div
-        ref={ringRef}
-        className="fixed top-0 left-0 z-[9998] w-8 h-8 border-2 border-emerald-500 rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2 opacity-70"
+      <div ref={ringRef}
+        className="fixed top-0 left-0 z-[9998] w-8 h-8 border-2 border-emerald-500 rounded-full pointer-events-none opacity-70 [transition:scale_0.25s,opacity_0.25s]"
         aria-hidden="true"
       />
     </>

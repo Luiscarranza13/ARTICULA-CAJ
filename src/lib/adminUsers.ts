@@ -1,5 +1,7 @@
 import type { User, UserRole } from '../types';
-import { dbRole, perfilToUser, supabase, type PerfilRow } from './supabase';
+import { dbRole, perfilToUser, supabase, supabaseAdmin, type PerfilRow } from './supabase';
+
+const db = supabaseAdmin ?? supabase;
 
 export type AdminUserInput = {
   nombre: string;
@@ -24,7 +26,7 @@ export type AdminUser = User & {
 // ─── Listar usuarios ──────────────────────────────────────────────────────────
 // Lee directamente de la tabla perfiles (no necesita Edge Function)
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('perfiles')
     .select('*')
     .order('created_at', { ascending: false });
@@ -44,9 +46,9 @@ export async function createAdminUser(input: AdminUserInput): Promise<AdminUser>
     if (error) throw error;
     return adminUserRowToUser(data!.user);
   } catch {
-    // Fallback: insertar perfil directo (sin auth.users — el usuario puede registrarse luego con el mismo correo)
+    // Fallback: insertar perfil directo (sin auth.users)
     const payload = toPerfilPayload(input, null);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('perfiles')
       .insert(payload)
       .select('*')
@@ -65,7 +67,7 @@ export async function updateAdminUser(id: string, input: AdminUserInput, authUse
   } catch {
     // Fallback: actualizar solo el perfil
     const payload = toPerfilPayload(input, authUserId ?? null);
-    const { error } = await supabase
+    const { error } = await db
       .from('perfiles')
       .update(payload)
       .eq('id', id);
@@ -81,7 +83,7 @@ export async function deleteAdminUser(user: AdminUser): Promise<void> {
     });
   } catch {
     // Fallback: eliminar solo el perfil
-    const { error } = await supabase
+    const { error } = await db
       .from('perfiles')
       .delete()
       .eq('id', user.id);

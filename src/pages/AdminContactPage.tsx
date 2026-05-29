@@ -78,7 +78,7 @@ export default function AdminContactPage() {
       await updateSiteConfig(toSave);
       toast.success('Configuración guardada');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la configuracion');
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la configuración');
     }
   };
 
@@ -183,7 +183,7 @@ export default function AdminContactPage() {
       };
 
       await sendCredentialEmail(payload);
-      toast.success('Usuario creado y credenciales enviadas automaticamente');
+      toast.success('Usuario creado y credenciales enviadas automáticamente');
 
       setCredentialSolicitud(null);
       await updateSolicitudEstado(credentialSolicitud.id, 'aprobado');

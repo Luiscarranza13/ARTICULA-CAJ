@@ -64,16 +64,16 @@ export default function LoginPage() {
   const handleForgotPassword = async () => {
     setError('');
     if (!email.trim()) {
-      setError('Ingresa tu correo para enviarte el enlace de recuperacion.');
+      setError('Ingresa tu correo para enviarte el enlace de recuperación.');
       return;
     }
 
     setResetLoading(true);
     try {
       await requestPasswordReset(email.trim().toLowerCase());
-      toast.success('Te enviamos un correo para cambiar tu contrasena.');
+      toast.success('Te enviamos un enlace para cambiar tu contraseña. Revisa tu bandeja de entrada.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo enviar el correo de recuperacion.');
+      toast.error(err instanceof Error ? err.message : 'No se pudo enviar el correo de recuperación.');
     } finally {
       setResetLoading(false);
     }
@@ -106,7 +106,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="label">Correo electronico</label>
+              <label htmlFor="email" className="label">Correo electrónico</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
                 <input
@@ -123,14 +123,14 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between gap-3 mb-1.5">
-                <label htmlFor="password" className="label mb-0">Contrasena</label>
+                <label htmlFor="password" className="label mb-0">Contraseña</label>
                 <button
                   type="button"
                   onClick={handleForgotPassword}
                   disabled={resetLoading}
                   className="cursor-pointer text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {resetLoading ? 'Enviando...' : 'Olvidaste tu contrasena?'}
+                  {resetLoading ? 'Enviando...' : '¿Olvidaste tu contraseña?'}
                 </button>
               </div>
               <div className="relative">
@@ -147,7 +147,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPass((s) => !s)}
-                  aria-label={showPass ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 transition-colors"
                 >
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

@@ -127,7 +127,7 @@ export default function AdminUsersPage() {
     };
 
     await sendCredentialEmail(payload);
-    toast.success('Credenciales enviadas automaticamente');
+    toast.success('Credenciales enviadas automáticamente');
   };
 
   return (
@@ -395,7 +395,7 @@ function ConfirmDelete({ user, onCancel, onConfirm }: {
             <Trash2 className="w-6 h-6 text-red-500" />
           </div>
           <h3 className="font-semibold text-surface-800 mb-1">Eliminar usuario</h3>
-          <p className="text-sm text-surface-500 mb-5">Se eliminara el perfil y, si existe, la cuenta de autenticacion de {user.correo}.</p>
+          <p className="text-sm text-surface-500 mb-5">Se eliminará el perfil y, si existe, la cuenta de autenticación de {user.correo}.</p>
           <div className="flex gap-3">
             <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center py-2 text-sm">Cancelar</button>
             <button type="button" onClick={onConfirm} className="flex-1 py-2 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors">

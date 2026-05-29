@@ -100,8 +100,10 @@ export const useStore = create<Store>()(
       loadSiteContent: async () => {
         set({ contentLoading: true });
         try {
-          const content = await fetchSiteContent(mockTestimonios);
+          const content = await fetchSiteContent(get().testimonios);
           set({ testimonios: content.testimonios, siteConfig: content.siteConfig });
+        } catch (error) {
+          console.warn('No se pudo cargar el contenido del sitio:', error);
         } finally {
           set({ contentLoading: false });
         }

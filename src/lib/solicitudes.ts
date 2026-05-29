@@ -1,5 +1,7 @@
-import { supabase } from './supabase';
-import { sendPublicSolicitudConfirmationEmail } from './gmail';
+import { supabase, supabaseAdmin } from './supabase';
+import { sendPublicSolicitudConfirmationEmail, sendPublicSolicitudEmail } from './gmail';
+
+const db = supabaseAdmin ?? supabase;
 
 export type SolicitudWeb = {
   id: string;
@@ -25,45 +27,57 @@ type SolicitudPayload = Omit<SolicitudWeb, 'id' | 'estado' | 'createdAt'>;
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const sendGmailApiKey = import.meta.env.VITE_SEND_GMAIL_API_KEY as string | undefined;
 
-export async function submitSolicitud(payload: SolicitudPayload) {
-  const safePayload = normalizeSolicitudPayload(payload);
-  const record = {
-    tipo: 'oportunidad',
-    titulo: `SOLICITUD:${safePayload.tipo}:${safePayload.nombre}`,
-    contenido: JSON.stringify(safePayload),
-    estado: 'pendiente',
-    fijada: false,
-  };
-
-  const { error } = await supabase.from('publicaciones').insert(record);
-  if (!error) return;
-
-  throw error;
-}
-
 export async function submitSolicitudAndNotify(payload: SolicitudPayload, notifyTo: string) {
   const safePayload = normalizeSolicitudPayload(payload);
   validateSolicitudPayload(safePayload);
 
+  // Intento principal: edge function maneja DB + correos
   const edgeResult = await submitSolicitudViaEdge(safePayload, notifyTo);
   if (edgeResult.ok) return;
 
-  const [saveResult, confirmationEmailResult] = await Promise.allSettled([
-    submitSolicitud(safePayload),
-    sendPublicSolicitudConfirmationEmail({
-      ...safePayload,
-      to: notifyTo,
-    }),
+  // Fallback resiliente: cualquier canal que funcione = éxito
+  const [saveResult, adminEmailResult, confirmEmailResult] = await Promise.allSettled([
+    saveToSupabase(safePayload),
+    sendPublicSolicitudEmail({ ...safePayload, to: notifyTo }),
+    sendPublicSolicitudConfirmationEmail({ ...safePayload, to: notifyTo }),
   ]);
 
-  if (saveResult.status === 'rejected') {
-    console.error('No se pudo guardar la solicitud en Supabase', saveResult.reason);
-    throw new Error('No se pudo registrar la solicitud en el sistema. Intenta nuevamente.');
+  const anySuccess =
+    saveResult.status === 'fulfilled' ||
+    adminEmailResult.status === 'fulfilled' ||
+    confirmEmailResult.status === 'fulfilled';
+
+  if (anySuccess) {
+    if (saveResult.status === 'rejected') {
+      console.warn('Solicitud enviada por correo pero no guardada en DB:', saveResult.reason);
+    }
+    return;
   }
 
-  if (confirmationEmailResult.status === 'rejected') {
-    throw confirmationEmailResult.reason;
-  }
+  // Todo falló
+  const firstError =
+    (adminEmailResult.status === 'rejected' ? adminEmailResult.reason : null) ??
+    (saveResult.status === 'rejected' ? saveResult.reason : null);
+  throw firstError instanceof Error
+    ? firstError
+    : new Error('No se pudo enviar la solicitud. Verifica tu conexión e intenta nuevamente.');
+}
+
+async function saveToSupabase(payload: SolicitudPayload) {
+  const record = {
+    tipo: 'oportunidad',
+    titulo: `SOLICITUD:${payload.tipo}:${payload.nombre}`,
+    contenido: JSON.stringify(payload),
+    estado: 'pendiente',
+    fijada: false,
+  };
+  const { error } = await db.from('publicaciones').insert(record);
+  if (error) throw error;
+}
+
+// Mantener export para compatibilidad
+export async function submitSolicitud(payload: SolicitudPayload) {
+  return saveToSupabase(normalizeSolicitudPayload(payload));
 }
 
 function normalizeSolicitudPayload(payload: SolicitudPayload): SolicitudPayload {
@@ -88,15 +102,12 @@ function validateSolicitudPayload(payload: SolicitudPayload) {
   if (!payload.nombre || payload.nombre.length < 3) {
     throw new Error('Ingresa tu nombre completo.');
   }
-
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
-    throw new Error('Ingresa un correo electronico valido.');
+    throw new Error('Ingresa un correo electrónico válido.');
   }
-
   if (!payload.mensaje || payload.mensaje.length < 10) {
-    throw new Error('Escribe un mensaje con mas detalle.');
+    throw new Error('Escribe un mensaje con más detalle (mínimo 10 caracteres).');
   }
-
   if (payload.tipo === 'adquisicion' && (!payload.cadena || !payload.cantidad)) {
     throw new Error('Completa la cadena productiva y la cantidad requerida.');
   }
@@ -119,18 +130,18 @@ async function submitSolicitudViaEdge(payload: SolicitudPayload, notifyTo: strin
 
     const data = await response.json().catch(() => null) as { error?: string } | null;
     if (!response.ok || data?.error) {
-      throw new Error(data?.error || `No se pudo enviar la solicitud. HTTP ${response.status}`);
+      console.warn('Edge function error:', data?.error ?? `HTTP ${response.status}`);
+      return { ok: false }; // No lanzar — dejar que el fallback maneje
     }
 
     return { ok: true };
-  } catch (error) {
-    if (error instanceof TypeError) return { ok: false };
-    throw error;
+  } catch {
+    return { ok: false }; // Cualquier error de red → fallback
   }
 }
 
 export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('publicaciones')
     .select('id,titulo,contenido,estado,created_at')
     .like('titulo', 'SOLICITUD:%')
@@ -161,12 +172,12 @@ export async function fetchSolicitudes(): Promise<SolicitudWeb[]> {
 }
 
 export async function updateSolicitudEstado(id: string, estado: string) {
-  const { error } = await supabase.from('publicaciones').update({ estado }).eq('id', id);
+  const { error } = await db.from('publicaciones').update({ estado }).eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteSolicitud(id: string) {
-  const { error } = await supabase.from('publicaciones').delete().eq('id', id);
+  const { error } = await db.from('publicaciones').delete().eq('id', id);
   if (error) throw error;
 }
 

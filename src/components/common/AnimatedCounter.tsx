@@ -9,17 +9,13 @@ interface Props {
 }
 
 export default function AnimatedCounter({ end, duration = 1800, prefix = '', suffix = '', decimals = 0 }: Props) {
-  const [count, setCount] = useState(0);
-  const rafRef = useRef<number | null>(null);
+   const [count, setCount] = useState(end === 0 ? 0 : 0);
+   const rafRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    // Cancelar animación anterior si end cambia antes de terminar
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+   useEffect(() => {
+     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 
-    if (end === 0) {
-      setCount(0);
-      return;
-    }
+     if (end === 0) return;
 
     const startTime = performance.now();
     const from = 0;

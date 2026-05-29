@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
+
+const db = supabaseAdmin ?? supabase;
 import type { SiteConfig, Testimonio } from '../types';
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
@@ -59,7 +61,7 @@ export async function fetchSiteConfig(): Promise<SiteConfig> {
 }
 
 export async function updateSiteConfigRemote(config: SiteConfig) {
-  const { error } = await supabase
+  const { error } = await db
     .from('site_config')
     .upsert({
       id: 'main',
@@ -93,7 +95,7 @@ export async function fetchTestimonios(fallback: Testimonio[]): Promise<Testimon
 }
 
 export async function createTestimonioRemote(input: Omit<Testimonio, 'id' | 'createdAt'>) {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('testimonios')
     .insert(toTestimonioPayload(input))
     .select('id,nombre,cargo,organizacion,foto,texto,rating,activo,orden,created_at')
@@ -104,7 +106,7 @@ export async function createTestimonioRemote(input: Omit<Testimonio, 'id' | 'cre
 }
 
 export async function updateTestimonioRemote(id: string, input: Partial<Testimonio>) {
-  const { error } = await supabase
+  const { error } = await db
     .from('testimonios')
     .update(toTestimonioPayload(input))
     .eq('id', id);
@@ -113,7 +115,7 @@ export async function updateTestimonioRemote(id: string, input: Partial<Testimon
 }
 
 export async function deleteTestimonioRemote(id: string) {
-  const { error } = await supabase.from('testimonios').delete().eq('id', id);
+  const { error } = await db.from('testimonios').delete().eq('id', id);
   if (error) throw error;
 }
 

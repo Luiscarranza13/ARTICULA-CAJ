@@ -23,7 +23,7 @@ type SolicitudPayload = {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return json({ ok: true }, 200);
-  if (request.method !== 'POST') return json({ error: 'Metodo no permitido' }, 405);
+  if (request.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
 
   try {
     assertApiKey(request);
@@ -31,14 +31,14 @@ Deno.serve(async (request) => {
     validatePayload(payload);
 
     await saveSolicitud(payload as SolicitudPayload);
-    const email = buildPublicSolicitudConfirmationEmailContent(payload as SolicitudPayload);
-    await sendGmail({
-      to: payload.email!,
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
-      replyTo: payload.notifyTo!,
-    });
+
+    // Enviar en paralelo: confirmación al remitente + notificación al admin
+    const confirmation = buildPublicSolicitudConfirmationEmailContent(payload as SolicitudPayload);
+    const notification = buildAdminNotificationEmailContent(payload as SolicitudPayload);
+    await Promise.all([
+      sendGmail({ to: payload.email!, subject: confirmation.subject, text: confirmation.text, html: confirmation.html, replyTo: payload.notifyTo! }),
+      sendGmail({ to: payload.notifyTo!, subject: notification.subject, text: notification.text, html: notification.html, replyTo: payload.email! }),
+    ]);
 
     return json({ ok: true }, 200);
   } catch (error) {
@@ -53,14 +53,14 @@ function assertApiKey(request: Request) {
   if (!expected) throw httpError(500, 'Falta configurar SEND_GMAIL_API_KEY en Supabase Secrets');
 
   const received = request.headers.get('x-api-key');
-  if (!received || received !== expected) throw httpError(401, 'x-api-key invalida');
+  if (!received || received !== expected) throw httpError(401, 'x-api-key inválida');
 }
 
 function validatePayload(payload: Partial<SolicitudPayload>) {
-  if (payload.tipo !== 'contacto' && payload.tipo !== 'adquisicion') throw httpError(400, 'Tipo de solicitud invalido');
-  if (!payload.notifyTo || !isEmail(payload.notifyTo)) throw httpError(400, 'Destinatario de notificacion invalido');
+  if (payload.tipo !== 'contacto' && payload.tipo !== 'adquisicion') throw httpError(400, 'Tipo de solicitud inválido');
+  if (!payload.notifyTo || !isEmail(payload.notifyTo)) throw httpError(400, 'Destinatario de notificación inválido');
   if (!payload.nombre?.trim()) throw httpError(400, 'Falta nombre');
-  if (!payload.email || !isEmail(payload.email)) throw httpError(400, 'Correo invalido');
+  if (!payload.email || !isEmail(payload.email)) throw httpError(400, 'Correo inválido');
   if (!payload.mensaje?.trim()) throw httpError(400, 'Falta mensaje');
   if (payload.tipo === 'adquisicion') {
     if (!payload.cadena?.trim()) throw httpError(400, 'Falta cadena productiva');
@@ -205,7 +205,7 @@ function buildPublicSolicitudConfirmationEmailContent(payload: SolicitudPayload)
     `Hola ${payload.nombre},`,
     '',
     'Recibimos tu mensaje en ARTICULA CAJ.',
-    'Nuestro equipo revisara la informacion y se contactara contigo pronto.',
+    'Nuestro equipo revisará la información y se contactará contigo pronto.',
     '',
     ...fields.map(([label, value]) => `${label}: ${value}`),
   ].join('\n');
@@ -233,7 +233,7 @@ function buildPublicSolicitudConfirmationEmailContent(payload: SolicitudPayload)
               <td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24 0%,#047857 58%,#16a34a 100%);padding:30px;color:#ffffff;">
                 <div style="font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ</div>
                 <h1 style="margin:8px 0 8px;font-size:30px;line-height:1.16;font-weight:900;color:#ffffff;">${escapeHtml(title)}</h1>
-                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Hola, ${escapeHtml(payload.nombre)}. Nuestro equipo revisara tu informacion y se contactara contigo pronto.</p>
+                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Hola, ${escapeHtml(payload.nombre)}. Nuestro equipo revisará tu información y se contactará contigo pronto.</p>
               </td>
             </tr>
             <tr>
@@ -253,6 +253,56 @@ function buildPublicSolicitudConfirmationEmailContent(payload: SolicitudPayload)
     </table>
   </body>
 </html>`;
+
+  return { subject, text, html };
+}
+
+function buildAdminNotificationEmailContent(payload: SolicitudPayload) {
+  const subject = `[ARTICULA CAJ] Nueva solicitud de ${payload.nombre} — ${payload.tipo}`;
+  const fields: [string, string | undefined][] = [
+    ['Nombre', payload.nombre],
+    ['Correo', payload.email],
+    ['Teléfono', payload.telefono],
+    ['DNI', payload.dni],
+    ['Organización', payload.organizacion],
+    ['Rubro', payload.rubro],
+    ['Empresa', payload.empresa],
+    ['Producto', payload.producto],
+    ['Cadena productiva', payload.cadena],
+    ['Cantidad', payload.cantidad],
+    ['Presupuesto', payload.presupuesto],
+    ['Mensaje', payload.mensaje],
+  ].filter((f): f is [string, string] => Boolean(f[1]));
+
+  const text = [
+    `Nueva solicitud de tipo "${payload.tipo}" en ARTICULA CAJ.`,
+    '',
+    ...fields.map(([l, v]) => `${l}: ${v}`),
+  ].join('\n');
+
+  const rows = fields.map(([l, v]) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;width:40%">${escapeHtml(l)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;word-break:break-word;">${escapeHtml(v)}</td>
+    </tr>`).join('');
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
+  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Segoe UI,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;width:100%;">
+      <tr><td align="center" style="padding:32px 14px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
+          <tr><td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24,#047857,#16a34a);padding:28px 30px;">
+            <div style="font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ — Panel Admin</div>
+            <h1 style="margin:8px 0 0;font-size:22px;color:#fff;font-weight:900;">Nueva solicitud de ${escapeHtml(payload.tipo)}</h1>
+          </td></tr>
+          <tr><td style="padding:24px 30px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows}</table>
+            <p style="margin:20px 0 0;color:#64748b;font-size:12px;">Esta notificación fue generada automáticamente. Responde a este correo para contactar al solicitante.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body></html>`;
 
   return { subject, text, html };
 }

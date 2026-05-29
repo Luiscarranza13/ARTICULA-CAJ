@@ -14,7 +14,7 @@ type SendGmailPayload = {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return json({ ok: true }, 200);
-  if (request.method !== 'POST') return json({ error: 'Metodo no permitido' }, 405);
+  if (request.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
 
   try {
     assertApiKey(request);
@@ -43,7 +43,7 @@ Deno.serve(async (request) => {
 
     if (!gmailResponse.ok) {
       const detail = await gmailResponse.text();
-      throw httpError(502, `Gmail API rechazo el envio: ${detail}`);
+      throw httpError(502, `Gmail API rechazó el envío: ${detail}`);
     }
 
     const data = await gmailResponse.json();
@@ -60,11 +60,11 @@ function assertApiKey(request: Request) {
   if (!expected) throw httpError(500, 'Falta configurar SEND_GMAIL_API_KEY en Supabase Secrets');
 
   const received = request.headers.get('x-api-key');
-  if (!received || received !== expected) throw httpError(401, 'x-api-key invalida');
+  if (!received || received !== expected) throw httpError(401, 'x-api-key inválida');
 }
 
 function validatePayload(payload: Partial<SendGmailPayload>) {
-  if (!payload.to || !isEmail(payload.to)) throw httpError(400, 'Destinatario invalido');
+  if (!payload.to || !isEmail(payload.to)) throw httpError(400, 'Destinatario inválido');
   if (!payload.subject?.trim()) throw httpError(400, 'Falta subject');
   if (!payload.text?.trim()) throw httpError(400, 'Falta text');
   if (!payload.html?.trim()) throw httpError(400, 'Falta html');

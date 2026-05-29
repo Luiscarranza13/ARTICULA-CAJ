@@ -118,10 +118,10 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
     'Tu solicitud fue aprobada y tu cuenta ya esta lista.',
     '',
     `Correo: ${payload.email}`,
-    `Contrasena: ${payload.password}`,
+    `Contraseña: ${payload.password}`,
     `Ingreso: ${payload.loginUrl}`,
     '',
-    'Por seguridad, cambia tu contrasena despues del primer ingreso.',
+    'Por seguridad, cambia tu contraseña después del primer ingreso.',
     '',
     `Contacto: ${supportEmail} | ${supportPhone} | ${supportAddress}`,
   ].join('\n');
@@ -165,7 +165,7 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
                   <tr>
                     <td style="padding:22px;">
                       <div style="font-size:13px;font-weight:900;color:#047857;text-transform:uppercase;letter-spacing:.08em;">Acceso a la plataforma</div>
-                      <p style="margin:8px 0 0;color:#475569;font-size:15px;line-height:1.65;">Guarda estas credenciales en un lugar seguro. Te recomendamos cambiar tu contrasena despues de iniciar sesion por primera vez.</p>
+                      <p style="margin:8px 0 0;color:#475569;font-size:15px;line-height:1.65;">Guarda estas credenciales en un lugar seguro. Te recomendamos cambiar tu contraseña después de iniciar sesión por primera vez.</p>
                     </td>
                   </tr>
                 </table>
@@ -183,7 +183,7 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
                   </tr>
                   <tr>
                     <td style="padding:0 0 18px;">
-                      <div style="font-size:12px;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">Contrasena temporal</div>
+                      <div style="font-size:12px;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">Contraseña temporal</div>
                       <div style="margin-top:7px;padding:16px;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:15px;color:#065f46;font-size:20px;font-weight:900;letter-spacing:.02em;word-break:break-all;">${password}</div>
                     </td>
                   </tr>
@@ -195,7 +195,7 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
                     </td>
                   </tr>
                 </table>
-                <p style="margin:14px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Si el boton no abre, copia este enlace en tu navegador:<br><a href="${loginUrl}" style="color:#047857;text-decoration:none;word-break:break-all;">${loginUrl}</a></p>
+                <p style="margin:14px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Si el botón no abre, copia este enlace en tu navegador:<br><a href="${loginUrl}" style="color:#047857;text-decoration:none;word-break:break-all;">${loginUrl}</a></p>
               </td>
             </tr>
 
@@ -235,7 +235,7 @@ export function buildCredentialEmailContent(payload: CredentialEmailPayload) {
                       Correo: <a href="mailto:${escapeHtml(supportEmail)}" style="color:#047857;text-decoration:none;font-weight:700;">${escapeHtml(supportEmail)}</a><br>
                       Telefono: ${escapeHtml(supportPhone)}<br>
                       Direccion: ${escapeHtml(supportAddress)}
-                      <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este mensaje fue enviado automaticamente porque tu solicitud de acceso fue aprobada por administracion. No compartas tus credenciales con terceros.</p>
+                      <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este mensaje fue enviado automáticamente porque tu solicitud de acceso fue aprobada por administración. No compartas tus credenciales con terceros.</p>
                     </td>
                   </tr>
                 </table>
@@ -300,7 +300,7 @@ export function buildPublicSolicitudEmailContent(payload: PublicSolicitudEmailPa
               <td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24 0%,#047857 58%,#16a34a 100%);padding:30px;color:#ffffff;">
                 <div style="font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ</div>
                 <h1 style="margin:8px 0 8px;font-size:30px;line-height:1.16;font-weight:900;color:#ffffff;">${escapeHtml(title)}</h1>
-                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Se recibio una solicitud desde el formulario publico. Revisa los datos y responde al correo del solicitante.</p>
+                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Se recibió una solicitud desde el formulario público. Revisa los datos y responde al correo del solicitante.</p>
               </td>
             </tr>
             <tr>
@@ -321,7 +321,7 @@ export function buildPublicSolicitudEmailContent(payload: PublicSolicitudEmailPa
                     </td>
                   </tr>
                 </table>
-                <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este correo fue enviado automaticamente por Gmail API desde ARTICULA CAJ.</p>
+                <p style="margin:18px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Este correo fue enviado automáticamente por Gmail API desde ARTICULA CAJ.</p>
               </td>
             </tr>
           </table>
@@ -336,11 +336,11 @@ export function buildPublicSolicitudEmailContent(payload: PublicSolicitudEmailPa
 
 export function buildPublicSolicitudConfirmationEmailContent(payload: PublicSolicitudEmailPayload) {
   const isAdquisicion = payload.tipo === 'adquisicion';
-  const title = isAdquisicion ? 'Recibimos tu solicitud de adquisicion' : 'Recibimos tu mensaje';
+  const title = isAdquisicion ? 'Recibimos tu solicitud de adquisición' : 'Recibimos tu mensaje';
   const subject = `${title} - ARTICULA CAJ`;
   const safeName = escapeHtml(payload.nombre);
   const detailRows = [
-    ['Tipo', isAdquisicion ? 'Solicitud de adquisicion' : 'Contacto general'],
+    ['Tipo', isAdquisicion ? 'Solicitud de adquisición' : 'Contacto general'],
     ['Producto', payload.producto],
     ['Cadena productiva', payload.cadena],
   ].filter(([, value]) => Boolean(value));
@@ -349,7 +349,7 @@ export function buildPublicSolicitudConfirmationEmailContent(payload: PublicSoli
     `Hola ${payload.nombre},`,
     '',
     'Recibimos tu solicitud en ARTICULA CAJ.',
-    'Nuestro equipo revisara la informacion y te contactara a la brevedad.',
+    'Nuestro equipo revisará la información y te contactará a la brevedad.',
     '',
     ...detailRows.map(([label, value]) => `${label}: ${value}`),
   ].join('\n');
@@ -369,7 +369,7 @@ export function buildPublicSolicitudConfirmationEmailContent(payload: PublicSoli
     <title>${escapeHtml(subject)}</title>
   </head>
   <body style="margin:0;padding:0;background:#eef6f2;font-family:Segoe UI,Arial,sans-serif;color:#102033;">
-    <div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;">ARTICULA CAJ recibio tu solicitud.</div>
+    <div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;">ARTICULA CAJ recibió tu solicitud.</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef6f2;width:100%;">
       <tr>
         <td align="center" style="padding:32px 14px;">
@@ -378,7 +378,7 @@ export function buildPublicSolicitudConfirmationEmailContent(payload: PublicSoli
               <td style="background:#064e3b;background-image:linear-gradient(135deg,#052e24 0%,#047857 58%,#16a34a 100%);padding:30px;color:#ffffff;">
                 <div style="font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#bbf7d0;">ARTICULA CAJ</div>
                 <h1 style="margin:8px 0 8px;font-size:30px;line-height:1.16;font-weight:900;color:#ffffff;">${escapeHtml(title)}</h1>
-                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Hola, ${safeName}. Nuestro equipo revisara tu informacion y te contactara a la brevedad.</p>
+                <p style="margin:0;color:#ecfdf5;font-size:15px;line-height:1.65;">Hola, ${safeName}. Nuestro equipo revisará tu información y te contactará a la brevedad.</p>
               </td>
             </tr>
             <tr>

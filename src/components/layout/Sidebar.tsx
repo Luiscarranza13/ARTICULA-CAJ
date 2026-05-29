@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ShoppingBag, BarChart3,
   Newspaper, Settings, LogOut, ChevronLeft, ChevronRight,
-  Inbox, HelpCircle, Link2, UserCog
+  Inbox, HelpCircle, Link2, UserCog, AlertTriangle, X,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { classNames, initials } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { canAccessRoute } from '../../lib/permissions';
+import { createPortal } from 'react-dom';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/app/dashboard' },
@@ -29,16 +31,23 @@ const bottomItems = [
 export default function Sidebar() {
   const location = useLocation();
   const { user, logout, sidebarCollapsed, toggleSidebarCollapsed } = useStore();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const visibleNavItems = navItems.filter((item) => canAccessRoute(user?.rol, item.path));
   const visibleBottomItems = bottomItems.filter((item) => canAccessRoute(user?.rol, item.path));
 
   const isActive = (path: string) => location.pathname === path;
+
   const handleLogout = async () => {
+    setLoggingOut(true);
     await supabase.auth.signOut();
     logout();
+    setConfirmOpen(false);
+    setLoggingOut(false);
   };
 
   return (
+    <>
     <motion.aside
       animate={{ width: sidebarCollapsed ? 72 : 256 }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -181,7 +190,7 @@ export default function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={handleLogout}
+                onClick={() => setConfirmOpen(true)}
                 className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors text-surface-400 hover:text-red-500"
                 title="Cerrar sesión"
                 aria-label="Cerrar sesión"
@@ -193,5 +202,48 @@ export default function Sidebar() {
         </div>
       </div>
     </motion.aside>
+
+    {/* Modal confirmación de cierre de sesión */}
+    {confirmOpen && createPortal(
+      <>
+        <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={() => setConfirmOpen(false)} />
+        <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+          <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-sm pointer-events-auto p-6">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-surface-900 text-base">Cerrar sesión</h3>
+                <p className="text-sm text-surface-500 mt-0.5">¿Estás seguro de que quieres salir? Tendrás que volver a ingresar tus credenciales.</p>
+              </div>
+              <button type="button" aria-label="Cancelar" onClick={() => setConfirmOpen(false)} className="ml-auto w-7 h-7 rounded-lg hover:bg-surface-100 flex items-center justify-center text-surface-400 flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setConfirmOpen(false)} className="flex-1 btn-secondary justify-center py-2.5 text-sm">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-60"
+              >
+                {loggingOut ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4" />
+                )}
+                {loggingOut ? 'Saliendo...' : 'Sí, cerrar sesión'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </>,
+      document.body
+    )}
+    </>
   );
 }
