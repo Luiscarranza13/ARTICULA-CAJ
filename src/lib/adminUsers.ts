@@ -43,9 +43,13 @@ export async function createAdminUser(input: AdminUserInput): Promise<AdminUser>
 
   if (!error && data?.user) return adminUserRowToUser(data.user);
 
-  // Fallback: insertar perfil directo con service key
+  // Fallback: upsert perfil con service key (no falla si ya existe el correo)
   const payload = toPerfilPayload(input, null);
-  const { data: row, error: dbErr } = await db.from('perfiles').insert(payload).select('*').single();
+  const { data: row, error: dbErr } = await db
+    .from('perfiles')
+    .upsert(payload, { onConflict: 'correo', ignoreDuplicates: false })
+    .select('*')
+    .single();
   if (dbErr) throw new Error(dbErr.message);
   return adminUserRowToUser(row as AdminUserRow);
 }

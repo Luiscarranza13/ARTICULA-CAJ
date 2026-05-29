@@ -183,13 +183,16 @@ export default function AdminContactPage() {
       };
 
       await sendCredentialEmail(payload);
-      toast.success('Usuario creado y credenciales enviadas automáticamente');
+      toast.success('Usuario creado y credenciales enviadas. Cambia el estado de la solicitud manualmente.');
 
       setCredentialSolicitud(null);
-      await updateSolicitudEstado(credentialSolicitud.id, 'aprobado');
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudieron crear las credenciales');
+      const msg = error instanceof Error ? error.message : 'No se pudieron crear las credenciales';
+      const friendlyMsg = msg.includes('dni') || msg.includes('unique')
+        ? 'Ya existe un usuario con ese DNI o correo. Edítalo desde el panel de Usuarios.'
+        : msg;
+      toast.error(friendlyMsg);
     } finally {
       setCredentialSaving(false);
     }
