@@ -43,7 +43,6 @@ export default function ArticulationPage() {
   const [activeTab, setActiveTab] = useState('feed');
   const [publications, setPublications] = useState<Publicacion[]>([]);
   const [actores, setActores] = useState<Actor[]>([]);
-  const [likedPosts, setLikedPosts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Publicacion | null>(null);
@@ -186,9 +185,6 @@ export default function ArticulationPage() {
     setDeleteTarget(null);
   };
 
-  const handleLike = (id: string) =>
-    setLikedPosts((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
-
   const needsFecha = form.tipo === 'evento' || form.tipo === 'convocatoria';
 
   return (
@@ -258,15 +254,10 @@ export default function ArticulationPage() {
                   <img src={pub.imagenes[0]} alt="" className="w-full max-h-80 object-cover rounded-2xl mb-3" />
                 )}
 
-                <div className="flex items-center gap-1 pt-3 border-t border-surface-100">
-                  <button type="button" onClick={() => handleLike(pub.id)}
-                    className={classNames('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm hover:bg-surface-50 transition-colors',
-                      likedPosts.includes(pub.id) ? 'text-red-500 font-medium' : 'text-surface-500')}>
-                    <Heart className={classNames('w-4 h-4', likedPosts.includes(pub.id) && 'fill-current')} />
-                    {likedPosts.includes(pub.id) ? 1 : 0}
-                  </button>
-                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><MessageSquare className="w-4 h-4" />0</button>
-                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><Share2 className="w-4 h-4" />0</button>
+                <div className="flex items-center gap-1 pt-3 border-t border-surface-50">
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-400 select-none"><Heart className="w-4 h-4" />0</span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-400 select-none"><MessageSquare className="w-4 h-4" />0</span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-400 select-none"><Share2 className="w-4 h-4" />0</span>
                 </div>
               </div>
             ))}
