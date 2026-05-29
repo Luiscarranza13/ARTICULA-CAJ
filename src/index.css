@@ -2,13 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── GSAP + Three.js visual enhancements ─────────────────────────────────── */
-
-/* Ocultar cursor nativo solo cuando el custom cursor está activo */
-body.custom-cursor-active * {
-  cursor: none !important;
-}
-
 /* Smooth reveal para elementos animados con GSAP */
 .hero-line,
 .hero-sub,

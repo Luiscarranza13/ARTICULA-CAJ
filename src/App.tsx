@@ -10,7 +10,6 @@ import LuisPage from './pages/LuisPage'
 const PublicDetailPage = lazy(() => import('./pages/PublicDetailPage'))
 import { useStore } from './store/useStore'
 import { getCurrentProfile, supabase } from './lib/supabase'
-import CustomCursor from './components/common/CustomCursor'
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const DirectoryPage = lazy(() => import('./pages/DirectoryPage'))
@@ -73,7 +72,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <CustomCursor />
       <a href="#main-content" className="skip-link">Saltar al contenido</a>
       <ThemeManager />
       <LuisModeManager />
