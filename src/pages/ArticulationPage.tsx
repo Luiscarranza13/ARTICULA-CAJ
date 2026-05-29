@@ -1,21 +1,23 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, Briefcase, Calendar, Edit, Heart, ImagePlus, MessageSquare,
-  Plus, Save, Send, Share2, Trash2, Users, X,
+  Plus, Save, Send, Share2, Trash2, Users, X, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Badge from '../components/common/Badge';
 import { fetchActores, fetchPublicaciones } from '../lib/data';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { classNames, initials, timeAgo } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import type { Actor, Publicacion } from '../types';
 
+const db = supabaseAdmin ?? supabase;
+
 const tabs = [
-  { id: 'feed',         label: 'Feed',          icon: Users },
-  { id: 'oportunidades',label: 'Oportunidades', icon: Briefcase },
-  { id: 'eventos',      label: 'Convocatorias', icon: Calendar },
+  { id: 'feed',          label: 'Feed',          icon: Users },
+  { id: 'oportunidades', label: 'Oportunidades', icon: Briefcase },
+  { id: 'eventos',       label: 'Convocatorias', icon: Calendar },
 ];
 
 const tipoColors: Record<string, string> = {
@@ -34,12 +36,7 @@ const tipoLabels: Record<PostTipo, string> = {
   evento:       'Evento',
 };
 
-const EMPTY_FORM = {
-  tipo: 'publicacion' as PostTipo,
-  titulo: '',
-  contenido: '',
-  fecha: '',
-};
+const EMPTY_FORM = { tipo: 'publicacion' as PostTipo, titulo: '', contenido: '', fecha: '' };
 
 export default function ArticulationPage() {
   const { user } = useStore();
@@ -52,11 +49,13 @@ export default function ArticulationPage() {
   const [editing, setEditing] = useState<Publicacion | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Publicacion | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = user?.rol === 'administrador';
+  const canEdit = (pub: Publicacion) => isAdmin || pub.autorId === user?.id;
 
   const load = async () => {
     setLoading(true);
@@ -79,18 +78,15 @@ export default function ArticulationPage() {
     return () => { void supabase.removeChannel(channel); };
   }, []);
 
-  const visiblePubs = useMemo(() =>
-    publications.filter((pub) => !pub.titulo?.startsWith('SOLICITUD:')),
-    [publications]
+  const visiblePubs = useMemo(
+    () => publications.filter((p) => !p.titulo?.startsWith('SOLICITUD:')),
+    [publications],
   );
 
   const filteredPubs = useMemo(() => {
-    const base = activeTab === 'oportunidades'
-      ? visiblePubs.filter((pub) => pub.tipo === 'oportunidad')
-      : activeTab === 'eventos'
-        ? visiblePubs.filter((pub) => ['convocatoria', 'evento'].includes(pub.tipo))
-        : visiblePubs;
-    return base;
+    if (activeTab === 'oportunidades') return visiblePubs.filter((p) => p.tipo === 'oportunidad');
+    if (activeTab === 'eventos') return visiblePubs.filter((p) => ['convocatoria', 'evento'].includes(p.tipo));
+    return visiblePubs;
   }, [activeTab, visiblePubs]);
 
   const openCreate = () => {
@@ -103,12 +99,7 @@ export default function ArticulationPage() {
 
   const openEdit = (pub: Publicacion) => {
     setEditing(pub);
-    setForm({
-      tipo: pub.tipo,
-      titulo: pub.titulo ?? '',
-      contenido: pub.contenido,
-      fecha: '',
-    });
+    setForm({ tipo: pub.tipo, titulo: pub.titulo ?? '', contenido: pub.contenido, fecha: '' });
     setImagePreview(pub.imagenes?.[0] ?? '');
     setImageFile(null);
     setShowModal(true);
@@ -139,9 +130,10 @@ export default function ArticulationPage() {
   };
 
   const savePost = async () => {
-    const isImageOnly = form.tipo === 'publicacion' && !form.contenido.trim() && imageFile;
-    if (!isImageOnly && !form.contenido.trim()) {
-      toast.error('Escribe algo o sube una imagen');
+    const hasContent = form.contenido.trim() || imageFile || imagePreview;
+    if (!hasContent) { toast.error('Escribe algo o sube una imagen'); return; }
+    if (form.tipo !== 'publicacion' && !form.titulo.trim()) {
+      toast.error('El título es obligatorio para este tipo de publicación');
       return;
     }
 
@@ -150,7 +142,7 @@ export default function ArticulationPage() {
       let imagenUrl: string | null = null;
       if (imageFile) {
         imagenUrl = await uploadImage();
-        if (!imagenUrl && imageFile) { setSaving(false); return; }
+        if (imagenUrl === null && imageFile) { setSaving(false); return; }
       } else if (editing && imagePreview) {
         imagenUrl = imagePreview;
       }
@@ -165,13 +157,16 @@ export default function ArticulationPage() {
         fijada: false,
       };
 
-      const result = editing
-        ? await supabase.from('publicaciones').update(payload).eq('id', editing.id)
-        : await supabase.from('publicaciones').insert(payload);
+      if (editing) {
+        const { error } = await db.from('publicaciones').update(payload).eq('id', editing.id);
+        if (error) { toast.error(`Error al actualizar: ${error.message}`); return; }
+        toast.success('Publicación actualizada');
+      } else {
+        const { error } = await db.from('publicaciones').insert(payload);
+        if (error) { toast.error(`Error al publicar: ${error.message}`); return; }
+        toast.success(isAdmin ? 'Publicación creada' : 'Publicación enviada — pendiente de revisión');
+      }
 
-      if (result.error) { toast.error(result.error.message); setSaving(false); return; }
-
-      toast.success(editing ? 'Publicación actualizada' : 'Publicación creada');
       closeModal();
       await load();
     } finally {
@@ -179,19 +174,20 @@ export default function ArticulationPage() {
     }
   };
 
-  const deletePost = async (pub: Publicacion) => {
-    const { error } = await supabase.from('publicaciones').delete().eq('id', pub.id);
-    if (error) toast.error(error.message);
-    else {
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { error } = await db.from('publicaciones').delete().eq('id', deleteTarget.id);
+    if (error) {
+      toast.error(`Error al eliminar: ${error.message}`);
+    } else {
       toast.success('Publicación eliminada');
-      setPublications((prev) => prev.filter((p) => p.id !== pub.id));
+      setPublications((prev) => prev.filter((p) => p.id !== deleteTarget.id));
     }
+    setDeleteTarget(null);
   };
 
   const handleLike = (id: string) =>
     setLikedPosts((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
-
-  const canEdit = (pub: Publicacion) => isAdmin || pub.autorId === user?.id;
 
   const needsFecha = form.tipo === 'evento' || form.tipo === 'convocatoria';
 
@@ -212,32 +208,28 @@ export default function ArticulationPage() {
         </div>
 
         {/* Botón nueva publicación */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <button type="button" onClick={openCreate}
-            className="w-full card p-4 flex items-center gap-3 text-left hover:shadow-card-hover transition-all cursor-pointer group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-              {initials(user?.nombre ?? 'U', user?.apellido)}
-            </div>
-            <span className="flex-1 text-surface-400 text-sm group-hover:text-surface-600">¿Qué quieres compartir con la red?</span>
-            <Plus className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-          </button>
-        </motion.div>
+        <button type="button" onClick={openCreate}
+          className="w-full card p-4 flex items-center gap-3 text-left hover:shadow-card-hover transition-all group">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+            {initials(user?.nombre ?? 'U', user?.apellido)}
+          </div>
+          <span className="flex-1 text-surface-400 text-sm group-hover:text-surface-600">¿Qué quieres compartir con la red?</span>
+          <Plus className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+        </button>
 
-        {/* Lista de publicaciones */}
+        {/* Publicaciones */}
         {loading ? (
           <div className="card p-8 text-center text-surface-400">Cargando publicaciones...</div>
+        ) : filteredPubs.length === 0 ? (
+          <div className="card p-8 text-center text-surface-400">No hay publicaciones en esta categoría.</div>
         ) : (
           <div className="space-y-4">
-            {filteredPubs.length === 0 && (
-              <div className="card p-8 text-center text-surface-400">No hay publicaciones en esta categoría.</div>
-            )}
-            {filteredPubs.map((pub, index) => (
-              <motion.div key={pub.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }} className="card p-5 hover:shadow-card-hover transition-all">
+            {filteredPubs.map((pub) => (
+              <div key={pub.id} className="card p-5 hover:shadow-card-hover transition-all">
                 <div className="flex items-start gap-3 mb-4">
                   {pub.autorAvatar
-                    ? <img src={pub.autorAvatar} alt={pub.autorNombre} className="w-10 h-10 rounded-xl object-cover" />
-                    : <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm">{initials(pub.autorNombre)}</div>}
+                    ? <img src={pub.autorAvatar} alt={pub.autorNombre} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                    : <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">{initials(pub.autorNombre)}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-surface-900 text-sm">{pub.autorNombre}</span>
@@ -247,26 +239,36 @@ export default function ArticulationPage() {
                     <p className="text-xs text-surface-400 mt-0.5">{timeAgo(pub.createdAt)}</p>
                   </div>
                   {canEdit(pub) && (
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button type="button" aria-label="Editar" onClick={() => openEdit(pub)} className="text-surface-400 hover:text-emerald-700"><Edit className="w-4 h-4" /></button>
-                      <button type="button" aria-label="Eliminar" onClick={() => deletePost(pub)} className="text-surface-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button type="button" aria-label="Editar" onClick={() => openEdit(pub)}
+                        className="w-7 h-7 rounded-lg bg-surface-100 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-center text-surface-500 transition-colors">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" aria-label="Eliminar" onClick={() => setDeleteTarget(pub)}
+                        className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   )}
                 </div>
+
                 {pub.titulo && <h3 className="font-display font-bold text-surface-900 mb-2">{pub.titulo}</h3>}
-                {pub.contenido !== '📷' && <p className="text-surface-700 text-sm leading-relaxed mb-4">{pub.contenido}</p>}
+                {pub.contenido !== '📷' && <p className="text-surface-700 text-sm leading-relaxed mb-3">{pub.contenido}</p>}
                 {pub.imagenes?.[0] && (
-                  <img src={pub.imagenes[0]} alt="" className="w-full max-h-72 object-cover rounded-2xl mb-4" />
+                  <img src={pub.imagenes[0]} alt="" className="w-full max-h-80 object-cover rounded-2xl mb-3" />
                 )}
+
                 <div className="flex items-center gap-1 pt-3 border-t border-surface-100">
                   <button type="button" onClick={() => handleLike(pub.id)}
-                    className={classNames('flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm hover:bg-surface-50', likedPosts.includes(pub.id) ? 'text-red-500 font-medium' : 'text-surface-500')}>
-                    <Heart className={classNames('w-4 h-4', likedPosts.includes(pub.id) && 'fill-current')} />{likedPosts.includes(pub.id) ? 1 : 0}
+                    className={classNames('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm hover:bg-surface-50 transition-colors',
+                      likedPosts.includes(pub.id) ? 'text-red-500 font-medium' : 'text-surface-500')}>
+                    <Heart className={classNames('w-4 h-4', likedPosts.includes(pub.id) && 'fill-current')} />
+                    {likedPosts.includes(pub.id) ? 1 : 0}
                   </button>
-                  <button type="button" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><MessageSquare className="w-4 h-4" />0</button>
-                  <button type="button" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><Share2 className="w-4 h-4" />0</button>
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><MessageSquare className="w-4 h-4" />0</button>
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-surface-500 hover:bg-surface-50"><Share2 className="w-4 h-4" />0</button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
@@ -279,7 +281,7 @@ export default function ArticulationPage() {
           <div className="space-y-3">
             {actores.slice(0, 5).map((actor) => (
               <div key={actor.id} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-surface-100 overflow-hidden flex items-center justify-center font-bold text-emerald-700">
+                <div className="w-9 h-9 rounded-xl bg-surface-100 flex items-center justify-center font-bold text-emerald-700 text-xs shrink-0">
                   {actor.nombre.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -290,6 +292,7 @@ export default function ArticulationPage() {
             ))}
           </div>
         </div>
+
         <div className="card p-5">
           <h3 className="font-display font-semibold text-surface-900 mb-4">Actividad en vivo</h3>
           <div className="space-y-3 text-sm">
@@ -300,49 +303,57 @@ export default function ArticulationPage() {
         </div>
       </div>
 
-      {/* Modal nueva/editar publicación */}
-      <AnimatePresence>
-        {showModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={closeModal}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white rounded-2xl shadow-glass-xl w-full max-w-lg p-6 space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
+      {/* Modal nueva / editar — portal para evitar stacking context del layout */}
+      {showModal && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={closeModal}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-lg max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-surface-100 shrink-0">
+              <div>
                 <h3 className="font-display text-lg font-bold text-surface-900">
                   {editing ? 'Editar publicación' : 'Nueva publicación'}
                 </h3>
-                <button type="button" aria-label="Cerrar" onClick={closeModal} className="text-surface-400 hover:text-surface-700">
-                  <X className="w-5 h-5" />
-                </button>
+                <p className="text-xs text-surface-400 mt-0.5">
+                  {editing ? 'Modifica y guarda.' : 'Comparte con la red de ARTICULA CAJ.'}
+                </p>
               </div>
+              <button type="button" aria-label="Cerrar" onClick={closeModal}
+                className="w-8 h-8 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
               {/* Tipo */}
               <div>
-                <label htmlFor="pub-tipo" className="label">Tipo</label>
+                <label htmlFor="pub-tipo" className="label">Tipo de publicación</label>
                 <select id="pub-tipo" className="input-field" value={form.tipo}
-                  onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value as PostTipo }))}>
+                  onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value as PostTipo, titulo: '' }))}>
                   {(Object.entries(tipoLabels) as [PostTipo, string][]).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Título (opcional para publicaciones, requerido para resto) */}
+              {/* Título (requerido salvo para publicación simple) */}
               {form.tipo !== 'publicacion' && (
                 <div>
                   <label htmlFor="pub-titulo" className="label">Título *</label>
                   <input id="pub-titulo" className="input-field"
-                    placeholder={form.tipo === 'oportunidad' ? 'Ej: Buscamos proveedores de café especial' : form.tipo === 'convocatoria' ? 'Ej: Fondos AGROIDEAS 2026' : 'Ej: Rueda de negocios Cajamarca'}
-                    value={form.titulo} onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} />
+                    placeholder={
+                      form.tipo === 'oportunidad' ? 'Ej: Buscamos proveedores de café' :
+                      form.tipo === 'convocatoria' ? 'Ej: Fondos AGROIDEAS 2026' :
+                      'Ej: Rueda de negocios Cajamarca'}
+                    value={form.titulo}
+                    onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} />
                 </div>
               )}
 
-              {/* Fecha (para eventos y convocatorias) */}
+              {/* Fecha para eventos/convocatorias */}
               {needsFecha && (
                 <div>
                   <label htmlFor="pub-fecha" className="label">Fecha</label>
@@ -351,26 +362,28 @@ export default function ArticulationPage() {
                 </div>
               )}
 
-              {/* Contenido (opcional si hay imagen) */}
+              {/* Contenido */}
               <div>
                 <label htmlFor="pub-contenido" className="label">
                   {form.tipo === 'publicacion' ? 'Descripción (opcional si subes imagen)' : 'Descripción *'}
                 </label>
                 <textarea id="pub-contenido" rows={4} className="input-field resize-none"
                   placeholder={form.tipo === 'publicacion' ? '¿Qué quieres compartir?' : 'Describe la oportunidad, convocatoria o evento...'}
-                  value={form.contenido} onChange={(e) => setForm((f) => ({ ...f, contenido: e.target.value }))} />
+                  value={form.contenido}
+                  onChange={(e) => setForm((f) => ({ ...f, contenido: e.target.value }))} />
               </div>
 
               {/* Imagen */}
               <div>
                 <label className="label">Imagen (opcional)</label>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" aria-label="Subir imagen para publicación" onChange={handleImageChange} />
+                <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                  aria-label="Subir imagen" onChange={handleImageChange} />
                 {imagePreview ? (
-                  <div className="relative">
-                    <img src={imagePreview} alt="Vista previa" className="w-full h-40 object-cover rounded-xl" />
+                  <div className="relative rounded-xl overflow-hidden">
+                    <img src={imagePreview} alt="Vista previa" className="w-full h-44 object-cover" />
                     <button type="button" aria-label="Quitar imagen"
                       onClick={() => { setImageFile(null); setImagePreview(''); }}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80">
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -378,28 +391,66 @@ export default function ArticulationPage() {
                   <button type="button" onClick={() => fileRef.current?.click()}
                     className="w-full border-2 border-dashed border-surface-200 rounded-xl py-6 flex flex-col items-center gap-2 text-surface-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
                     <ImagePlus className="w-6 h-6" />
-                    <span className="text-sm">Subir imagen</span>
+                    <span className="text-sm">Haz clic para subir imagen</span>
                   </button>
                 )}
               </div>
 
               {!isAdmin && (
-                <p className="text-xs text-surface-400 bg-surface-50 rounded-xl px-4 py-3">
-                  Tu publicación quedará en revisión hasta que el administrador la apruebe.
-                </p>
+                <div className="flex gap-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">Tu publicación quedará pendiente hasta que el administrador la apruebe.</p>
+                </div>
               )}
+            </div>
 
-              <div className="flex justify-end gap-3">
-                <button type="button" className="btn-secondary" onClick={closeModal}>Cancelar</button>
-                <button type="button" className="btn-primary" onClick={savePost} disabled={saving}>
-                  {editing ? <Save className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                  {saving ? 'Guardando...' : editing ? 'Guardar' : 'Publicar'}
-                </button>
-              </div>
-            </motion.div>
+            {/* Footer */}
+            <div className="border-t border-surface-100 p-5 flex gap-3 justify-end shrink-0">
+              <button type="button" className="btn-secondary" onClick={closeModal}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={savePost} disabled={saving}>
+                {saving ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando...</>
+                ) : editing ? (
+                  <><Save className="w-4 h-4" /> Guardar cambios</>
+                ) : (
+                  <><Send className="w-4 h-4" /> Publicar</>
+                )}
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>,
+        document.body,
+      )}
+
+      {/* Confirm delete — portal */}
+      {deleteTarget && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+              <Trash2 className="w-5 h-5 text-red-500" />
+            </div>
+            <h3 className="font-display font-bold text-surface-900">¿Eliminar publicación?</h3>
+            <p className="text-sm text-surface-500 mt-1 mb-5 line-clamp-2">
+              {deleteTarget.titulo
+                ? <>"<span className="font-medium text-surface-700">{deleteTarget.titulo}</span>" será eliminado permanentemente.</>
+                : 'Esta publicación será eliminada permanentemente.'}
+            </p>
+            <div className="flex gap-3">
+              <button type="button" className="flex-1 btn-secondary justify-center" onClick={() => setDeleteTarget(null)}>
+                Cancelar
+              </button>
+              <button type="button"
+                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors"
+                onClick={confirmDelete}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -407,7 +458,9 @@ export default function ArticulationPage() {
 function Metric({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center"><Icon className="w-4 h-4" /></div>
+      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4" />
+      </div>
       <span className="text-surface-600 flex-1">{label}</span>
       <span className="font-bold text-surface-900">{value}</span>
     </div>
