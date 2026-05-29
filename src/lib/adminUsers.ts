@@ -36,59 +36,45 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
 }
 
 // ─── Crear usuario ─────────────────────────────────────────────────────────────
-// Intenta usar la Edge Function (para crear auth.users con service_role).
-// Si la función no está desplegada, inserta el perfil directamente.
 export async function createAdminUser(input: AdminUserInput): Promise<AdminUser> {
-  try {
-    const { data, error } = await supabase.functions.invoke<{ user: AdminUserRow }>('admin-users', {
-      body: { action: 'create', input },
-    });
-    if (error) throw error;
-    return adminUserRowToUser(data!.user);
-  } catch {
-    // Fallback: insertar perfil directo (sin auth.users)
-    const payload = toPerfilPayload(input, null);
-    const { data, error } = await db
-      .from('perfiles')
-      .insert(payload)
-      .select('*')
-      .single();
-    if (error) throw new Error(error.message);
-    return adminUserRowToUser(data as AdminUserRow);
-  }
+  const { data, error } = await supabase.functions.invoke<{ user: AdminUserRow }>('admin-users', {
+    body: { action: 'create', input },
+  });
+
+  if (!error && data?.user) return adminUserRowToUser(data.user);
+
+  // Fallback: insertar perfil directo con service key
+  const payload = toPerfilPayload(input, null);
+  const { data: row, error: dbErr } = await db.from('perfiles').insert(payload).select('*').single();
+  if (dbErr) throw new Error(dbErr.message);
+  return adminUserRowToUser(row as AdminUserRow);
 }
 
 // ─── Actualizar usuario ───────────────────────────────────────────────────────
 export async function updateAdminUser(id: string, input: AdminUserInput, authUserId?: string | null): Promise<void> {
-  try {
-    await supabase.functions.invoke('admin-users', {
-      body: { action: 'update', id, authUserId, input },
-    });
-  } catch {
-    // Fallback: actualizar solo el perfil
-    const payload = toPerfilPayload(input, authUserId ?? null);
-    const { error } = await db
-      .from('perfiles')
-      .update(payload)
-      .eq('id', id);
-    if (error) throw new Error(error.message);
-  }
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'update', id, authUserId, input },
+  });
+
+  if (!error) return;
+
+  // Fallback: actualizar solo el perfil con service key (bypasa RLS)
+  const payload = toPerfilPayload(input, authUserId ?? null);
+  const { error: dbErr } = await db.from('perfiles').update(payload).eq('id', id);
+  if (dbErr) throw new Error(dbErr.message);
 }
 
 // ─── Eliminar usuario ─────────────────────────────────────────────────────────
 export async function deleteAdminUser(user: AdminUser): Promise<void> {
-  try {
-    await supabase.functions.invoke('admin-users', {
-      body: { action: 'delete', id: user.id, authUserId: user.authUserId },
-    });
-  } catch {
-    // Fallback: eliminar solo el perfil
-    const { error } = await db
-      .from('perfiles')
-      .delete()
-      .eq('id', user.id);
-    if (error) throw new Error(error.message);
-  }
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'delete', id: user.id, authUserId: user.authUserId },
+  });
+
+  if (!error) return;
+
+  // Fallback: eliminar solo el perfil con service key
+  const { error: dbErr } = await db.from('perfiles').delete().eq('id', user.id);
+  if (dbErr) throw new Error(dbErr.message);
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

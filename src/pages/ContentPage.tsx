@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Edit, Newspaper, Plus, Save, Search, Trash2, X } from 'lucide-react';
+import { Calendar, Edit, Newspaper, Save, Search, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Badge from '../components/common/Badge';
 import { supabase } from '../lib/supabase';
@@ -78,12 +78,6 @@ export default function ContentPage() {
     return items.filter((item) => !q || [item.titulo, item.descripcion, item.estado].some((value) => value?.toLowerCase().includes(q)));
   }, [items, search]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
-    setShowForm(true);
-  };
-
   const openEdit = (item: Item) => {
     setEditing(item);
     setForm({ ...emptyForm, titulo: item.titulo, descripcion: item.descripcion, fecha: item.fecha ?? '' });
@@ -161,16 +155,13 @@ export default function ContentPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-        <div className="flex gap-2 overflow-x-auto">
-          {(['noticias', 'eventos', 'convocatorias'] as Tab[]).map((t) => (
-            <button type="button" key={t} onClick={() => setTab(t)}
-              className={classNames('px-4 py-2 rounded-xl text-sm font-semibold', tab === t ? 'bg-emerald-600 text-white' : 'bg-white border border-surface-200 text-surface-600')}>
-              {tabLabels[t]}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn-primary" onClick={openCreate}><Plus className="w-4 h-4" />Nuevo {tabLabels[tab].toLowerCase().slice(0, -1)}</button>
+      <div className="flex gap-2 overflow-x-auto">
+        {(['noticias', 'eventos', 'convocatorias'] as Tab[]).map((t) => (
+          <button type="button" key={t} onClick={() => setTab(t)}
+            className={classNames('px-4 py-2 rounded-xl text-sm font-semibold', tab === t ? 'bg-emerald-600 text-white' : 'bg-white border border-surface-200 text-surface-600')}>
+            {tabLabels[t]}
+          </button>
+        ))}
       </div>
 
       <div className="card p-4">
@@ -207,7 +198,7 @@ export default function ContentPage() {
         ))}
         {filtered.length === 0 && (
           <div className="md:col-span-2 xl:col-span-3 card p-10 text-center text-surface-400">
-            No hay {tabLabels[tab].toLowerCase()} aún. Crea el primero.
+            No hay {tabLabels[tab].toLowerCase()} publicadas aún.
           </div>
         )}
       </div>
