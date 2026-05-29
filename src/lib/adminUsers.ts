@@ -37,15 +37,37 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
 
 // ─── Crear usuario ─────────────────────────────────────────────────────────────
 export async function createAdminUser(input: AdminUserInput): Promise<AdminUser> {
-  const { data, error } = await supabase.functions.invoke<{ user: AdminUserRow }>('admin-users', {
+  // Intento 1: edge function (crea auth + perfil)
+  const { data: edgeData, error: edgeError } = await supabase.functions.invoke<{ user: AdminUserRow }>('admin-users', {
     body: { action: 'create', input },
   });
+  if (!edgeError && edgeData?.user) return adminUserRowToUser(edgeData.user);
 
-  if (!error && data?.user) return adminUserRowToUser(data.user);
+  // Intento 2: fallback completo con supabaseAdmin
+  if (!supabaseAdmin) throw new Error('No se puede crear el usuario: falta la clave de servicio.');
 
-  // Fallback: upsert perfil con service key (no falla si ya existe el correo)
-  const payload = toPerfilPayload(input, null);
-  const { data: row, error: dbErr } = await db
+  const email = input.correo.trim().toLowerCase();
+  const password = input.password;
+  if (!password || password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
+
+  // 2a. Crear auth user (puede hacer login con email + password)
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { nombre: input.nombre, apellido: input.apellido, rol: input.rol },
+  });
+
+  if (authError) {
+    // Si ya existe el auth user, intentar actualizar solo el perfil
+    if (!authError.message.includes('already been registered')) throw new Error(authError.message);
+  }
+
+  const authUserId = authData?.user?.id ?? null;
+
+  // 2b. Upsert perfil con el auth_user_id (no falla si ya existe)
+  const payload = toPerfilPayload(input, authUserId, email);
+  const { data: row, error: dbErr } = await supabaseAdmin
     .from('perfiles')
     .upsert(payload, { onConflict: 'correo', ignoreDuplicates: false })
     .select('*')
