@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CheckCircle2, Clock, Mail, RefreshCw, Search, Shield, Trash2, XCircle,
-  MessageSquare, Star, Plus, Pencil, X, Eye, EyeOff, GripVertical, Quote,
-  Settings, Users, Package, Network, TrendingUp, Phone, MapPin, Save,
-  KeyRound, Copy,
+  CheckCircle2, Clock, Eye, EyeOff, Mail, RefreshCw, Search, Shield, Trash2, XCircle,
+  MessageSquare, X, Settings,
+  Network, TrendingUp, Phone, MapPin, Save,
+  KeyRound, Copy, Users, Package,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Badge from '../components/common/Badge';
@@ -15,20 +14,9 @@ import { deleteSolicitud, fetchSolicitudes, updateSolicitudEstado, type Solicitu
 import { supabase } from '../lib/supabase';
 import { classNames, getRolLabel, timeAgo } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import type { Testimonio, SiteConfig, UserRole } from '../types';
+import type { SiteConfig, UserRole } from '../types';
 
-type TabId = 'solicitudes' | 'testimonios' | 'configuracion';
-
-const TESTIMONIO_EMPTY: Omit<Testimonio, 'id' | 'createdAt'> = {
-  nombre: '',
-  cargo: '',
-  organizacion: '',
-  foto: '',
-  texto: '',
-  rating: 5,
-  activo: true,
-  orden: 0,
-};
+type TabId = 'solicitudes' | 'configuracion';
 
 type CredentialForm = {
   nombre: string;
@@ -44,7 +32,7 @@ type CredentialForm = {
 };
 
 export default function AdminContactPage() {
-  const { user, testimonios, addTestimonio, updateTestimonio, deleteTestimonio, siteConfig, updateSiteConfig } = useStore();
+  const { user, siteConfig, updateSiteConfig } = useStore();
   const [tab, setTab] = useState<TabId>('solicitudes');
 
   // Config form state (controlled so edits are live)
@@ -90,11 +78,6 @@ export default function AdminContactPage() {
   const [selected, setSelected] = useState<SolicitudWeb | null>(null);
   const [credentialSolicitud, setCredentialSolicitud] = useState<SolicitudWeb | null>(null);
   const [credentialSaving, setCredentialSaving] = useState(false);
-
-  // Testimonios state
-  const [testimonioModal, setTestimonioModal] = useState<{ open: boolean; item: Testimonio | null }>({ open: false, item: null });
-  const [testimonioForm, setTestimonioForm] = useState<Omit<Testimonio, 'id' | 'createdAt'>>(TESTIMONIO_EMPTY);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const isAdmin = user?.rol === 'administrador';
 
@@ -198,52 +181,6 @@ export default function AdminContactPage() {
     }
   };
 
-  const openTestimonioCreate = () => {
-    setTestimonioForm({ ...TESTIMONIO_EMPTY, orden: testimonios.length + 1 });
-    setTestimonioModal({ open: true, item: null });
-  };
-
-  const openTestimonioEdit = (t: Testimonio) => {
-    setTestimonioForm({ nombre: t.nombre, cargo: t.cargo, organizacion: t.organizacion ?? '', foto: t.foto ?? '', texto: t.texto, rating: t.rating, activo: t.activo, orden: t.orden });
-    setTestimonioModal({ open: true, item: t });
-  };
-
-  const lookupUserPhoto = async (nombre: string) => {
-    if (!nombre.trim()) return;
-    const { data } = await supabase
-      .from('perfiles')
-      .select('avatar_url')
-      .ilike('nombre', `%${nombre.split(' ')[0]}%`)
-      .not('avatar_url', 'is', null)
-      .limit(1)
-      .maybeSingle();
-    if (data?.avatar_url) {
-      setTestimonioForm((f) => ({ ...f, foto: data.avatar_url as string }));
-      toast.success('Foto obtenida del perfil');
-    } else {
-      toast('No se encontró foto de perfil para ese nombre', { icon: 'ℹ️' });
-    }
-  };
-
-  const saveTestimonio = async () => {
-    if (!testimonioForm.nombre || !testimonioForm.cargo || !testimonioForm.texto) {
-      toast.error('Nombre, cargo y texto son obligatorios');
-      return;
-    }
-    try {
-      if (testimonioModal.item) {
-        await updateTestimonio(testimonioModal.item.id, testimonioForm);
-        toast.success('Testimonio actualizado');
-      } else {
-        await addTestimonio(testimonioForm);
-        toast.success('Testimonio creado');
-      }
-      setTestimonioModal({ open: false, item: null });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el testimonio');
-    }
-  };
-
   const stats = {
     total: solicitudes.length,
     pendientes: solicitudes.filter((s) => s.estado === 'pendiente').length,
@@ -251,16 +188,13 @@ export default function AdminContactPage() {
     rechazadas: solicitudes.filter((s) => s.estado === 'rechazado').length,
   };
 
-  const sortedTestimonios = [...testimonios].sort((a, b) => a.orden - b.orden);
-
   return (
     <div className="space-y-6 max-w-[1400px]">
       {/* Tab navigation */}
       <div className="flex gap-1 p-1 bg-surface-100 rounded-2xl w-fit">
         {([
-          { id: 'solicitudes' as TabId,    label: 'Solicitudes',    icon: MessageSquare },
-          { id: 'testimonios' as TabId,    label: 'Testimonios',    icon: Quote },
-          { id: 'configuracion' as TabId,  label: 'Configuración',  icon: Settings },
+          { id: 'solicitudes' as TabId, label: 'Solicitudes',  icon: MessageSquare },
+          { id: 'configuracion' as TabId, label: 'Configuración', icon: Settings },
         ]).map(({ id, label, icon: Icon }) => (
           <button type="button" key={id} onClick={() => setTab(id)}
             className={classNames('flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200',
@@ -368,108 +302,6 @@ export default function AdminContactPage() {
         </>
       )}
 
-      {/* ─── TESTIMONIOS TAB ─── */}
-      {tab === 'testimonios' && (
-        <>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-surface-500">{testimonios.filter((t) => t.activo).length} activos · {testimonios.length} total</p>
-            </div>
-            <button type="button" onClick={openTestimonioCreate} className="btn-primary">
-              <Plus className="w-4 h-4" /> Nuevo testimonio
-            </button>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total testimonios" value={testimonios.length} icon={Quote} />
-            <StatCard label="Activos" value={testimonios.filter((t) => t.activo).length} icon={CheckCircle2} color="text-emerald-600 bg-emerald-50" />
-            <StatCard label="Ocultos" value={testimonios.filter((t) => !t.activo).length} icon={EyeOff} color="text-surface-400 bg-surface-50" />
-            <StatCard label="Promedio rating" value={testimonios.length > 0 ? Math.round(testimonios.reduce((a, t) => a + t.rating, 0) / testimonios.length * 10) / 10 : 0} icon={Star} color="text-amber-500 bg-amber-50" />
-          </div>
-
-          {/* Testimonios grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sortedTestimonios.map((t) => (
-              <motion.div key={t.id} layout initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-                className={classNames('card p-5 flex flex-col gap-3 relative', !t.activo && 'opacity-60')}>
-
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {t.foto ? (
-                      <img src={t.foto} alt={t.nombre} className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-emerald-100" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                        {t.nombre.charAt(0)}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-semibold text-surface-900 text-sm truncate">{t.nombre}</p>
-                      <p className="text-xs text-emerald-600 truncate">{t.cargo}</p>
-                      {t.organizacion && <p className="text-xs text-surface-400 truncate">{t.organizacion}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button type="button"
-                      onClick={() => void updateTestimonio(t.id, { activo: !t.activo }).catch((error) => {
-                        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar');
-                      })}
-                      className={classNames('w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
-                        t.activo ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-surface-100 text-surface-400 hover:bg-surface-200')}
-                      aria-label={t.activo ? 'Ocultar testimonio' : 'Mostrar testimonio'}>
-                      {t.activo ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    </button>
-                    <button type="button" aria-label="Editar testimonio" onClick={() => openTestimonioEdit(t)}
-                      className="w-7 h-7 rounded-lg bg-surface-100 hover:bg-emerald-50 hover:text-emerald-600 flex items-center justify-center transition-colors text-surface-500">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" aria-label="Eliminar testimonio" onClick={() => setDeleteConfirm(t.id)}
-                      className="w-7 h-7 rounded-lg bg-surface-100 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors text-surface-400">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Stars */}
-                <div className="flex gap-0.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className={classNames('w-3.5 h-3.5', i < t.rating ? 'text-amber-400 fill-amber-400' : 'text-surface-200')} />
-                  ))}
-                </div>
-
-                {/* Text */}
-                <p className="text-sm text-surface-600 leading-relaxed line-clamp-3 flex-1">"{t.texto}"</p>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-2 border-t border-surface-100">
-                  <span className={classNames('text-xs px-2.5 py-1 rounded-full font-medium',
-                    t.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-surface-100 text-surface-500')}>
-                    {t.activo ? 'Visible' : 'Oculto'}
-                  </span>
-                  <div className="flex items-center gap-1 text-surface-400">
-                    <GripVertical className="w-3.5 h-3.5" />
-                    <span className="text-xs">Orden {t.orden}</span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-
-            {/* Empty state */}
-            {testimonios.length === 0 && (
-              <div className="md:col-span-2 xl:col-span-3 card p-16 text-center">
-                <Quote className="w-12 h-12 text-surface-300 mx-auto mb-4" />
-                <p className="text-surface-400 font-medium">No hay testimonios aún</p>
-                <p className="text-surface-300 text-sm mt-1">Crea el primer testimonio para que aparezca en la landing page</p>
-                <button type="button" onClick={openTestimonioCreate} className="btn-primary mt-6 mx-auto">
-                  <Plus className="w-4 h-4" /> Crear primer testimonio
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
       {/* ─── CONFIGURACIÓN TAB ─── */}
       {tab === 'configuracion' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -562,13 +394,10 @@ export default function AdminContactPage() {
       )}
 
       {/* ─── Solicitud detail modal ─── */}
-      <AnimatePresence>
-        {selected && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      {selected && createPortal(
+        <>
+          <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm" onClick={() => setSelected(null)} />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
               <div className="bg-white rounded-2xl shadow-glass-xl w-full max-w-lg pointer-events-auto">
                 <div className="flex items-center justify-between p-5 border-b border-surface-100">
                   <div>
@@ -606,148 +435,20 @@ export default function AdminContactPage() {
                   <div className="p-4 bg-surface-50 rounded-xl text-sm text-surface-700 leading-relaxed">{selected.mensaje}</div>
                 </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          </div>
+        </>,
+        document.body,
+      )}
 
-      <AnimatePresence>
-        {credentialSolicitud && (
-          <CredentialModal
-            solicitud={credentialSolicitud}
-            saving={credentialSaving}
-            onClose={() => setCredentialSolicitud(null)}
-            onSubmit={createCredentialsFromSolicitud}
-          />
-        )}
-      </AnimatePresence>
+      {credentialSolicitud && (
+        <CredentialModal
+          solicitud={credentialSolicitud}
+          saving={credentialSaving}
+          onClose={() => setCredentialSolicitud(null)}
+          onSubmit={createCredentialsFromSolicitud}
+        />
+      )}
 
-      {/* ─── Testimonio create/edit modal ─── */}
-      <AnimatePresence>
-        {testimonioModal.open && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setTestimonioModal({ open: false, item: null })} />
-            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
-              <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-lg pointer-events-auto max-h-[90vh] flex flex-col">
-                <div className="flex items-center justify-between p-5 border-b border-surface-100 flex-shrink-0">
-                  <h3 className="font-display text-lg font-bold text-surface-900">
-                    {testimonioModal.item ? 'Editar testimonio' : 'Nuevo testimonio'}
-                  </h3>
-                  <button type="button" aria-label="Cerrar" onClick={() => setTestimonioModal({ open: false, item: null })}
-                    className="w-8 h-8 rounded-xl hover:bg-surface-100 flex items-center justify-center text-surface-400">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="overflow-y-auto flex-1 p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="label">Nombre *</label>
-                      <div className="flex gap-2">
-                        <input type="text" className="input-field flex-1" placeholder="Nombre completo" value={testimonioForm.nombre}
-                          onChange={(e) => setTestimonioForm((f) => ({ ...f, nombre: e.target.value }))} />
-                        <button type="button" title="Buscar foto del perfil por nombre"
-                          onClick={() => void lookupUserPhoto(testimonioForm.nombre)}
-                          className="btn-secondary px-3 py-2 text-xs whitespace-nowrap">
-                          Buscar foto
-                        </button>
-                      </div>
-                      {testimonioForm.foto && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <img src={testimonioForm.foto} alt="Vista previa" className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-100" />
-                          <span className="text-xs text-emerald-600">Foto encontrada</span>
-                          <button type="button" onClick={() => setTestimonioForm((f) => ({ ...f, foto: '' }))}
-                            className="text-xs text-surface-400 hover:text-red-500">Quitar</button>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="label">Cargo *</label>
-                      <input type="text" className="input-field" placeholder="Ej: Presidenta de Cooperativa" value={testimonioForm.cargo}
-                        onChange={(e) => setTestimonioForm((f) => ({ ...f, cargo: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className="label">Organización</label>
-                      <input type="text" className="input-field" placeholder="Empresa o institución" value={testimonioForm.organizacion}
-                        onChange={(e) => setTestimonioForm((f) => ({ ...f, organizacion: e.target.value }))} />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="label">Testimonio *</label>
-                      <textarea rows={4} className="input-field resize-none" placeholder="El texto del testimonio..."
-                        value={testimonioForm.texto} onChange={(e) => setTestimonioForm((f) => ({ ...f, texto: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label htmlFor="t-orden" className="label">Orden</label>
-                      <input id="t-orden" type="number" min={1} className="input-field" value={testimonioForm.orden}
-                        onChange={(e) => setTestimonioForm((f) => ({ ...f, orden: Number(e.target.value) }))} />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="label">Visibilidad</label>
-                      <button type="button"
-                        onClick={() => setTestimonioForm((f) => ({ ...f, activo: !f.activo }))}
-                        className={classNames('flex items-center gap-3 px-4 py-3 rounded-xl border w-full transition-all',
-                          testimonioForm.activo ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-surface-200 bg-surface-50 text-surface-500')}>
-                        {testimonioForm.activo ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        <span className="font-medium text-sm">{testimonioForm.activo ? 'Visible en la landing page' : 'Oculto (no se muestra)'}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-surface-100 p-5 flex gap-3 flex-shrink-0">
-                  <button type="button" onClick={() => setTestimonioModal({ open: false, item: null })} className="btn-secondary flex-1 justify-center">
-                    Cancelar
-                  </button>
-                  <button type="button" onClick={saveTestimonio} className="btn-primary flex-1 justify-center">
-                    {testimonioModal.item ? 'Guardar cambios' : 'Crear testimonio'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Delete confirm modal ─── */}
-      <AnimatePresence>
-        {deleteConfirm && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
-            <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-              <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-glass-xl pointer-events-auto">
-                <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
-                  <Trash2 className="w-6 h-6 text-red-500" />
-                </div>
-                <h3 className="font-semibold text-surface-800 mb-1">Eliminar testimonio</h3>
-                <p className="text-sm text-surface-500 mb-5">Esta acción no se puede deshacer.</p>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1 justify-center py-2 text-sm">Cancelar</button>
-                  <button type="button"
-                    onClick={() => {
-                      const id = deleteConfirm;
-                      if (!id) return;
-                      void deleteTestimonio(id)
-                        .then(() => {
-                          setDeleteConfirm(null);
-                          toast.success('Testimonio eliminado');
-                        })
-                        .catch((error) => {
-                          toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
-                        });
-                    }}
-                    className="flex-1 py-2 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors">
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Non-admin notice for solicitudes tab */}
       {tab === 'solicitudes' && !isAdmin && (
@@ -822,10 +523,8 @@ function CredentialModal({ solicitud, saving, onClose, onSubmit }: {
 
   return createPortal(
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 32 }}
-        className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
         <form onSubmit={submit} className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-3xl pointer-events-auto max-h-[calc(100vh-32px)] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-surface-100 flex-shrink-0">
             <div>
@@ -888,7 +587,7 @@ function CredentialModal({ solicitud, saving, onClose, onSubmit }: {
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
     </>,
     document.body
   );
