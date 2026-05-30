@@ -30,40 +30,36 @@ export default function App() {
   const loadSiteContent = useStore((state) => state.loadSiteContent);
 
   useEffect(() => {
-    let mounted = true;
+    // Mostrar spinner desde el inicio — INITIAL_SESSION lo resolverá
+    setAuthLoading(true);
 
-    const loadSession = async () => {
-      setAuthLoading(true);
-      try {
-        const profile = await getCurrentProfile();
-        if (!mounted) return;
-        if (profile) login(profile);
-        else logout();
-      } catch {
-        if (mounted) logout();
-      }
-    };
-
-    queueMicrotask(() => void loadSession());
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Solo cerrar sesión cuando Supabase lo indica explícitamente
+      if (event === 'SIGNED_OUT') {
         logout();
         return;
       }
 
+      // Sin sesión activa y es el estado inicial → no hay usuario
+      if (!session) {
+        if (event === 'INITIAL_SESSION') logout();
+        return;
+      }
+
+      // Sesión activa → cargar perfil
       getCurrentProfile()
         .then((profile) => {
-          if (profile) login(profile);
-          else setAuthLoading(false);
+          if (profile) {
+            login(profile);
+          } else {
+            // Sesión auth existe pero no hay perfil en BD → desconectar limpiamente
+            void supabase.auth.signOut();
+          }
         })
         .catch(() => setAuthLoading(false));
     });
 
-    return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
-    };
+    return () => data.subscription.unsubscribe();
   }, [login, logout, setAuthLoading]);
 
   useEffect(() => {
