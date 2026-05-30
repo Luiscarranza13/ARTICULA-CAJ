@@ -1,8 +1,8 @@
 import { supabase, supabaseAdmin, type PerfilRow, perfilToUser } from './supabase';
+import type { Actor, Evento, Producto, Publicacion } from '../types';
 
 // Para KPIs y conteos públicos usamos supabaseAdmin para evitar bloqueos de RLS
 const db = supabaseAdmin ?? supabase;
-import type { Actor, Evento, Producto, Publicacion } from '../types';
 
 type ProductRow = {
   id: string;
