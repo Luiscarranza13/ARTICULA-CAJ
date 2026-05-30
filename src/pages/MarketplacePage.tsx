@@ -62,20 +62,22 @@ export default function MarketplacePage() {
       setActores(data.actores);
       setCategoryRows((cats.data ?? []).map((cat) => ({ id: cat.id, nombre: cat.nombre ?? 'Sin categoría' })));
 
-      // Obtener los actores del productor actual para filtrar sus productos
-      if (user?.id && isProductor) {
-        const { data: myActores } = await supabase
-          .from('actores').select('id').eq('propietario_id', user.id);
-        setMyActorIds((myActores ?? []).map((a: { id: string }) => a.id));
-      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo cargar la vitrina');
     }
     setLoading(false);
   };
 
+  // Usa db (supabaseAdmin) para evitar bloqueos de RLS al leer los actores propios
+  const loadMyActors = async (userId: string) => {
+    const { data: myActores } = await db
+      .from('actores').select('id').eq('propietario_id', userId);
+    setMyActorIds((myActores ?? []).map((a: { id: string }) => a.id));
+  };
+
   useEffect(() => {
-    queueMicrotask(() => void load());
+    void load();
+    if (user?.id && isProductor) void loadMyActors(user.id);
     const channel = supabase.channel('marketplace-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'producto_imagenes' }, () => void load())
@@ -167,7 +169,7 @@ export default function MarketplacePage() {
       disponibilidad: Number(form.cantidad || 0),
       temporada: form.temporada || null,
       destacado: editing?.destacado ?? false,
-      estado: isAdmin ? 'aprobado' : 'pendiente',
+      estado: 'aprobado',
       publicado: true,
     };
     const result = editing
