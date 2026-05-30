@@ -9,7 +9,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import LuisPage from './pages/LuisPage'
 const PublicDetailPage = lazy(() => import('./pages/PublicDetailPage'))
 import { useStore } from './store/useStore'
-import { getCurrentProfile, supabase } from './lib/supabase'
+import { getProfileByUser, supabase } from './lib/supabase'
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const DirectoryPage = lazy(() => import('./pages/DirectoryPage'))
@@ -46,8 +46,9 @@ export default function App() {
         return;
       }
 
-      // Sesión activa → cargar perfil
-      getCurrentProfile()
+      // Sesión activa → cargar perfil usando session.user directamente
+      // (evita llamar getSession() de nuevo, que puede retornar null por race condition)
+      getProfileByUser(session.user)
         .then((profile) => {
           if (profile) {
             login(profile);
