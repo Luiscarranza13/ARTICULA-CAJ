@@ -1,4 +1,7 @@
-import { supabase, type PerfilRow, perfilToUser } from './supabase';
+import { supabase, supabaseAdmin, type PerfilRow, perfilToUser } from './supabase';
+
+// Para KPIs y conteos públicos usamos supabaseAdmin para evitar bloqueos de RLS
+const db = supabaseAdmin ?? supabase;
 import type { Actor, Evento, Producto, Publicacion } from '../types';
 
 type ProductRow = {
@@ -90,11 +93,9 @@ const fallbackImage = 'https://images.unsplash.com/photo-1500382017468-9049fed74
 // También exportada para IndicatorsPage y AdminContactPage.
 export async function fetchRealKpis(): Promise<PublicLandingKpis> {
   const [perfilesRes, productosRes, configRes] = await Promise.all([
-    // Total de perfiles aprobados (productores activos)
-    supabase.from('perfiles').select('id', { count: 'exact', head: true }).eq('estado', 'aprobado'),
-    // Productos publicados en vitrina
-    supabase.from('productos').select('id', { count: 'exact', head: true }).eq('publicado', true),
-    // Acuerdos y ventas son editables manualmente desde Configuración
+    // Total de perfiles aprobados — usa db (admin) para bypasear RLS en landing pública
+    db.from('perfiles').select('id', { count: 'exact', head: true }).eq('estado', 'aprobado'),
+    db.from('productos').select('id', { count: 'exact', head: true }).eq('publicado', true),
     supabase.from('site_config').select('acuerdos_count,ventas_impacto').eq('id', 'main').maybeSingle(),
   ]);
 
@@ -113,8 +114,9 @@ export async function fetchRealKpis(): Promise<PublicLandingKpis> {
 // Intenta obtener KPIs desde la vista materializada; si falla, usa conteo directo
 async function fetchKpis(): Promise<PublicLandingKpis> {
   try {
-    const { data, error } = await supabase.from('v_dashboard_kpis').select('*').maybeSingle();
-    if (!error && data && (data as Record<string, unknown>).productores_activos != null) {
+    // Usar db (admin) para que la vista no sea limitada por RLS
+    const { data, error } = await db.from('v_dashboard_kpis').select('*').maybeSingle();
+    if (!error && data && Number((data as Record<string, unknown>).productores_activos) > 0) {
       return data as PublicLandingKpis;
     }
   } catch {
