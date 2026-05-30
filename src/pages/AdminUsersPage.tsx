@@ -1,5 +1,5 @@
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle2, Copy, Eye, EyeOff, Pencil, Plus, RefreshCw, Search,
   Shield, Trash2, UserRound, X,
@@ -218,22 +218,20 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      <AnimatePresence>
-        {modal.open && (
-          <UserModal
-            user={modal.user}
-            saving={saving}
-            onClose={() => setModal({ open: false, user: null })}
-            onSave={saveUser}
-          />
-        )}
-      </AnimatePresence>
+      {modal.open && createPortal(
+        <UserModal
+          user={modal.user}
+          saving={saving}
+          onClose={() => setModal({ open: false, user: null })}
+          onSave={saveUser}
+        />,
+        document.body,
+      )}
 
-      <AnimatePresence>
-        {deleteTarget && (
-          <ConfirmDelete user={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={removeUser} />
-        )}
-      </AnimatePresence>
+      {deleteTarget && createPortal(
+        <ConfirmDelete user={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={removeUser} />,
+        document.body,
+      )}
     </div>
   );
 }
@@ -278,9 +276,9 @@ function UserModal({ user, saving, onClose, onSave }: {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 32 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
-        <form onSubmit={submit} className="bg-white rounded-t-3xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-2xl pointer-events-auto max-h-[92vh] flex flex-col">
+      <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
+        <form onSubmit={submit} className="bg-white rounded-t-2xl sm:rounded-2xl shadow-glass-xl w-full sm:max-w-2xl pointer-events-auto max-h-[92vh] flex flex-col">
           <div className="flex items-center justify-between p-5 border-b border-surface-100">
             <div>
               <h3 className="font-display text-lg font-bold text-surface-900">{user ? 'Editar usuario' : 'Nuevo usuario'}</h3>
@@ -341,7 +339,7 @@ function UserModal({ user, saving, onClose, onSave }: {
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
     </>
   );
 }
@@ -388,14 +386,14 @@ function ConfirmDelete({ user, onCancel, onConfirm }: {
 }) {
   return (
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm" onClick={onCancel} />
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
         <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-glass-xl pointer-events-auto">
           <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
             <Trash2 className="w-6 h-6 text-red-500" />
           </div>
           <h3 className="font-semibold text-surface-800 mb-1">Eliminar usuario</h3>
-          <p className="text-sm text-surface-500 mb-5">Se eliminará el perfil y, si existe, la cuenta de autenticación de {user.correo}.</p>
+          <p className="text-sm text-surface-500 mb-5">Se eliminará el perfil y, si existe, la cuenta de autenticación de <strong>{user.correo}</strong>.</p>
           <div className="flex gap-3">
             <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center py-2 text-sm">Cancelar</button>
             <button type="button" onClick={onConfirm} className="flex-1 py-2 text-sm font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors">
@@ -403,7 +401,7 @@ function ConfirmDelete({ user, onCancel, onConfirm }: {
             </button>
           </div>
         </div>
-      </motion.div>
+      </div>
     </>
   );
 }
