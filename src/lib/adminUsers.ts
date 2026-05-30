@@ -78,19 +78,34 @@ export async function createAdminUser(input: AdminUserInput): Promise<AdminUser>
 
 // ─── Actualizar usuario ───────────────────────────────────────────────────────
 export async function updateAdminUser(id: string, input: AdminUserInput, authUserId?: string | null): Promise<void> {
-  // Intento 1: edge function (actualiza auth + perfil)
-  const { error: edgeError } = await supabase.functions.invoke('admin-users', {
-    body: { action: 'update', id, authUserId, input },
-  });
-  if (!edgeError) return;
+  const needsPasswordChange = Boolean(input.password && input.password.length >= 8);
+
+  // Intento 1: edge function — la saltamos cuando authUserId es null y hay cambio de contraseña,
+  // porque la edge function desplegada no puede resolver el auth user por email en ese caso.
+  const tryEdge = authUserId || !needsPasswordChange;
+  if (tryEdge) {
+    const { error: edgeError } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'update', id, authUserId, input },
+    });
+    if (!edgeError) return;
+  }
 
   // Intento 2: fallback con supabaseAdmin
   if (!supabaseAdmin) throw new Error('No se puede actualizar: falta la clave de servicio.');
 
   const email = input.correo.trim().toLowerCase();
 
-  // 2a. Actualizar auth user si existe (email y/o password)
-  if (authUserId) {
+  // 2a. Actualizar auth user (buscar por email si no tenemos el ID)
+  let resolvedAuthUserId = authUserId ?? null;
+  if (!resolvedAuthUserId) {
+    const { data: list } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    resolvedAuthUserId = list.users.find((u) => u.email === email)?.id ?? null;
+    if (resolvedAuthUserId) {
+      await supabaseAdmin.from('perfiles').update({ auth_user_id: resolvedAuthUserId }).eq('id', id);
+    }
+  }
+
+  if (resolvedAuthUserId) {
     const authUpdates: Record<string, unknown> = {
       email,
       email_confirm: true,
@@ -99,12 +114,22 @@ export async function updateAdminUser(id: string, input: AdminUserInput, authUse
     if (input.password && input.password.length >= 8) {
       authUpdates.password = input.password;
     }
-    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, authUpdates);
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(resolvedAuthUserId, authUpdates);
     if (authErr) throw new Error(`Error actualizando autenticación: ${authErr.message}`);
+  } else if (input.password && input.password.length >= 8) {
+    // El usuario existe en perfiles pero no tiene cuenta auth — crearla ahora
+    const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { nombre: input.nombre, apellido: input.apellido, rol: input.rol },
+    });
+    if (authErr) throw new Error(`Error creando autenticación: ${authErr.message}`);
+    resolvedAuthUserId = authData.user.id;
   }
 
   // 2b. Actualizar perfil
-  const payload = toPerfilPayload(input, authUserId ?? null, email);
+  const payload = toPerfilPayload(input, resolvedAuthUserId, email);
   const { error: dbErr } = await supabaseAdmin.from('perfiles').update(payload).eq('id', id);
   if (dbErr) throw new Error(dbErr.message);
 }

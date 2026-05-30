@@ -103,8 +103,23 @@ async function createUser(input: AdminUserInput) {
 
 async function updateUser(id: string, input: AdminUserInput, authUserId: string | null) {
   const email = input.correo.trim().toLowerCase();
-  if (authUserId) {
-    const authResponse = await supabaseFetch(`/auth/v1/admin/users/${authUserId}`, {
+
+  // Si no viene authUserId, buscarlo por email para poder cambiar la contraseña
+  let resolvedAuthUserId = authUserId;
+  if (!resolvedAuthUserId) {
+    resolvedAuthUserId = await findAuthUserIdByEmail(email);
+    // Guardar el vínculo en el perfil para que futuras ediciones funcionen sin buscarlo de nuevo
+    if (resolvedAuthUserId) {
+      await supabaseFetch(`/rest/v1/perfiles?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ auth_user_id: resolvedAuthUserId }),
+      });
+    }
+  }
+
+  if (resolvedAuthUserId) {
+    const authResponse = await supabaseFetch(`/auth/v1/admin/users/${resolvedAuthUserId}`, {
       method: 'PUT',
       body: JSON.stringify({
         email,
@@ -114,14 +129,23 @@ async function updateUser(id: string, input: AdminUserInput, authUserId: string 
       }),
     });
     if (!authResponse.ok) throw httpError(502, 'No se pudo actualizar auth');
+  } else if (input.password) {
+    throw httpError(404, 'No se encontró el usuario de autenticación para cambiar la contraseña');
   }
 
   const response = await supabaseFetch(`/rest/v1/perfiles?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify(toPerfilPayload(input, authUserId, email)),
+    body: JSON.stringify(toPerfilPayload(input, resolvedAuthUserId, email)),
   });
   if (!response.ok) throw httpError(502, await response.text());
+}
+
+async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+  const response = await supabaseFetch(`/auth/v1/admin/users?page=1&per_page=1000&filter=${encodeURIComponent(email)}`);
+  if (!response.ok) return null;
+  const data = await response.json() as { users?: { id: string; email: string }[] };
+  return data.users?.find((u) => u.email === email)?.id ?? null;
 }
 
 async function deleteUser(id: string, authUserId: string | null) {
