@@ -86,9 +86,11 @@ export default function MarketplacePage() {
 
   const filtered = useMemo(() => {
     let base = productos;
-    // Productor ve solo sus propios productos
-    if (isProductor && myActorIds.length > 0) {
-      base = productos.filter((p) => myActorIds.includes(p.productoId));
+    // Productor ve solo sus propios productos; si no tiene actores aún, no ve ninguno
+    if (isProductor) {
+      base = myActorIds.length > 0
+        ? productos.filter((p) => myActorIds.includes(p.productoId))
+        : [];
     }
     const q = search.toLowerCase();
     return base.filter((product) =>
@@ -101,9 +103,38 @@ export default function MarketplacePage() {
     isAdmin || myActorIds.includes(product.productoId);
 
   const openCreate = async () => {
+    let actorIds = myActorIds;
+
+    // Si el productor no tiene actores aún, crear uno automáticamente con su info de perfil
+    if (isProductor && actorIds.length === 0) {
+      const nombre = user?.organizacion?.trim() || `${user?.nombre ?? ''} ${user?.apellido ?? ''}`.trim() || 'Mi organización';
+      const { data: newActor, error } = await db
+        .from('actores')
+        .insert({
+          nombre,
+          tipo: 'productor',
+          rubro_texto: user?.rubro || null,
+          ubicacion_texto: user?.ubicacion || null,
+          propietario_id: user?.id ?? null,
+          contacto: user?.celular || null,
+          correo: user?.correo || null,
+          estado: 'aprobado',
+          verificado: false,
+        })
+        .select('id')
+        .single();
+
+      if (error || !newActor) {
+        toast.error('No se pudo crear tu perfil de vendedor. Contacta al administrador.');
+        return;
+      }
+      actorIds = [newActor.id];
+      setMyActorIds(actorIds);
+    }
+
     const defaultCat = categoryRows[0]?.id ?? await firstCategoriaId();
-    const defaultActor = isProductor && myActorIds.length > 0
-      ? myActorIds[0]
+    const defaultActor = isProductor && actorIds.length > 0
+      ? actorIds[0]
       : actores[0]?.id ?? '';
     setEditing(null);
     setForm({ ...emptyForm, actorId: defaultActor, categoriaId: defaultCat });
@@ -238,7 +269,11 @@ export default function MarketplacePage() {
           </div>
           {filtered.length === 0 && (
             <div className="card p-10 text-center text-surface-400">
-              {isProductor ? 'No tienes productos publicados aún. ¡Publica tu primer producto!' : 'No se encontraron productos.'}
+              {isProductor
+                ? myActorIds.length === 0
+                  ? 'Aún no tienes perfil de vendedor. Haz clic en "Publicar producto" para crearlo automáticamente y publicar tu primer producto.'
+                  : 'No tienes productos publicados aún. ¡Publica tu primer producto!'
+                : 'No se encontraron productos.'}
             </div>
           )}
         </>
