@@ -78,29 +78,57 @@ export async function createAdminUser(input: AdminUserInput): Promise<AdminUser>
 
 // ─── Actualizar usuario ───────────────────────────────────────────────────────
 export async function updateAdminUser(id: string, input: AdminUserInput, authUserId?: string | null): Promise<void> {
-  const { error } = await supabase.functions.invoke('admin-users', {
+  // Intento 1: edge function (actualiza auth + perfil)
+  const { error: edgeError } = await supabase.functions.invoke('admin-users', {
     body: { action: 'update', id, authUserId, input },
   });
+  if (!edgeError) return;
 
-  if (!error) return;
+  // Intento 2: fallback con supabaseAdmin
+  if (!supabaseAdmin) throw new Error('No se puede actualizar: falta la clave de servicio.');
 
-  // Fallback: actualizar solo el perfil con service key (bypasa RLS)
-  const payload = toPerfilPayload(input, authUserId ?? null);
-  const { error: dbErr } = await db.from('perfiles').update(payload).eq('id', id);
+  const email = input.correo.trim().toLowerCase();
+
+  // 2a. Actualizar auth user si existe (email y/o password)
+  if (authUserId) {
+    const authUpdates: Record<string, unknown> = {
+      email,
+      email_confirm: true,
+      user_metadata: { nombre: input.nombre, apellido: input.apellido, rol: input.rol },
+    };
+    if (input.password && input.password.length >= 8) {
+      authUpdates.password = input.password;
+    }
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, authUpdates);
+    if (authErr) throw new Error(`Error actualizando autenticación: ${authErr.message}`);
+  }
+
+  // 2b. Actualizar perfil
+  const payload = toPerfilPayload(input, authUserId ?? null, email);
+  const { error: dbErr } = await supabaseAdmin.from('perfiles').update(payload).eq('id', id);
   if (dbErr) throw new Error(dbErr.message);
 }
 
 // ─── Eliminar usuario ─────────────────────────────────────────────────────────
 export async function deleteAdminUser(user: AdminUser): Promise<void> {
-  const { error } = await supabase.functions.invoke('admin-users', {
+  // Intento 1: edge function (elimina auth + perfil)
+  const { error: edgeError } = await supabase.functions.invoke('admin-users', {
     body: { action: 'delete', id: user.id, authUserId: user.authUserId },
   });
+  if (!edgeError) return;
 
-  if (!error) return;
+  // Intento 2: fallback con supabaseAdmin
+  if (!supabaseAdmin) throw new Error('No se puede eliminar: falta la clave de servicio.');
 
-  // Fallback: eliminar solo el perfil con service key
-  const { error: dbErr } = await db.from('perfiles').delete().eq('id', user.id);
+  // Eliminar perfil primero
+  const { error: dbErr } = await supabaseAdmin.from('perfiles').delete().eq('id', user.id);
   if (dbErr) throw new Error(dbErr.message);
+
+  // Eliminar auth user si existe
+  if (user.authUserId) {
+    const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(user.authUserId);
+    if (authErr) console.warn('Perfil eliminado pero auth user no:', authErr.message);
+  }
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
